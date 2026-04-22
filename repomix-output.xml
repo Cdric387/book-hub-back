@@ -1,0 +1,1875 @@
+This file is a merged representation of the entire codebase, combined into a single document by Repomix.
+
+<file_summary>
+This section contains a summary of this file.
+
+<purpose>
+This file contains a packed representation of the entire repository's contents.
+It is designed to be easily consumable by AI systems for analysis, code review,
+or other automated processes.
+</purpose>
+
+<file_format>
+The content is organized as follows:
+1. This summary section
+2. Repository information
+3. Directory structure
+4. Repository files (if enabled)
+5. Multiple file entries, each consisting of:
+  - File path as an attribute
+  - Full contents of the file
+</file_format>
+
+<usage_guidelines>
+- This file should be treated as read-only. Any changes should be made to the
+  original repository files, not this packed version.
+- When processing this file, use the file path to distinguish
+  between different files in the repository.
+- Be aware that this file may contain sensitive information. Handle it with
+  the same level of security as you would the original repository.
+</usage_guidelines>
+
+<notes>
+- Some files may have been excluded based on .gitignore rules and Repomix's configuration
+- Binary files are not included in this packed representation. Please refer to the Repository Structure section for a complete list of file paths, including binary files
+- Files matching patterns in .gitignore are excluded
+- Files matching default ignore patterns are excluded
+- Files are sorted by Git change count (files with more changes are at the bottom)
+</notes>
+
+</file_summary>
+
+<directory_structure>
+.gitattributes
+.gitignore
+build.gradle
+gradle/wrapper/gradle-wrapper.jar
+gradle/wrapper/gradle-wrapper.properties
+gradlew
+gradlew.bat
+README.md
+settings.gradle
+src/main/java/com/bookhub/BookHubApplication.java
+src/main/java/com/bookhub/config/SecurityConfig.java
+src/main/java/com/bookhub/config/SwaggerConfig.java
+src/main/java/com/bookhub/controller/AuthController.java
+src/main/java/com/bookhub/controller/BookController.java
+src/main/java/com/bookhub/dto/auth/AuthResponse.java
+src/main/java/com/bookhub/dto/auth/LoginRequest.java
+src/main/java/com/bookhub/dto/auth/RegisterRequest.java
+src/main/java/com/bookhub/dto/book/BookRequest.java
+src/main/java/com/bookhub/dto/book/BookResponse.java
+src/main/java/com/bookhub/entity/Book.java
+src/main/java/com/bookhub/entity/Loan.java
+src/main/java/com/bookhub/entity/LoanStatus.java
+src/main/java/com/bookhub/entity/Rating.java
+src/main/java/com/bookhub/entity/Reservation.java
+src/main/java/com/bookhub/entity/ReservationStatus.java
+src/main/java/com/bookhub/entity/Role.java
+src/main/java/com/bookhub/entity/User.java
+src/main/java/com/bookhub/exception/ApiException.java
+src/main/java/com/bookhub/exception/BusinessException.java
+src/main/java/com/bookhub/exception/ResourceNotFoundException.java
+src/main/java/com/bookhub/repository/BookRepository.java
+src/main/java/com/bookhub/repository/LoanRepository.java
+src/main/java/com/bookhub/repository/RatingRepository.java
+src/main/java/com/bookhub/repository/ReservationRepository.java
+src/main/java/com/bookhub/repository/UserRepository.java
+src/main/java/com/bookhub/security/JwtAuthFilter.java
+src/main/java/com/bookhub/security/JwtService.java
+src/main/java/com/bookhub/security/UserDetailsServiceImpl.java
+src/main/java/com/bookhub/service/AuthService.java
+src/main/java/com/bookhub/service/BookService.java
+src/main/resources/application.properties
+src/test/java/com/bookhub/BookHubApplicationTests.java
+</directory_structure>
+
+<files>
+This section contains the contents of the repository's files.
+
+<file path="README.md">
+# BookHub — Backend Spring Boot
+
+API REST pour la plateforme de gestion de bibliothèque communautaire.
+
+## Prérequis
+
+- Java 17+
+- SQL Server 2019+ (voir ci-dessous pour Docker)
+- IntelliJ IDEA
+
+## Lancer SQL Server avec Docker (recommandé)
+
+```bash
+docker run -e "ACCEPT_EULA=Y" -e "SA_PASSWORD=BookHub2024!" \
+  -p 1433:1433 --name bookhub-sql \
+  -d mcr.microsoft.com/mssql/server:2022-latest
+```
+
+Puis créer la base :
+```bash
+docker exec -it bookhub-sql /opt/mssql-tools18/bin/sqlcmd \
+  -S localhost -U sa -P "BookHub2024!" -No \
+  -Q "CREATE DATABASE bookhub"
+```
+
+## Lancer le projet
+
+1. Cloner le repo
+2. Ouvrir dans IntelliJ
+3. Vérifier `src/main/resources/application.yml` (port SQL Server, password)
+4. Run `BookHubApplication.java`
+
+## Accès
+
+- API : http://localhost:8080
+- Swagger : http://localhost:8080/swagger-ui.html
+
+## Structure
+
+```
+src/main/java/com/bookhub/
+├── entity/          Entités JPA (User, Book, Loan, Reservation, Rating)
+├── repository/      Interfaces Spring Data JPA
+├── dto/             Objets de transfert (Request/Response)
+├── service/         Logique métier
+├── controller/      Contrôleurs REST
+├── security/        JWT (JwtService, JwtAuthFilter)
+├── config/          SecurityConfig, SwaggerConfig
+└── exception/       Gestion globale des erreurs
+```
+
+## Endpoints principaux
+
+| Méthode | Route | Accès |
+|---------|-------|-------|
+| POST | /api/auth/register | Public |
+| POST | /api/auth/login | Public |
+| GET | /api/books | Public |
+| GET | /api/books/{id} | Public |
+| GET | /api/books/search?q= | Public |
+| POST | /api/books | LIBRARIAN/ADMIN |
+| PUT | /api/books/{id} | LIBRARIAN/ADMIN |
+| DELETE | /api/books/{id} | ADMIN |
+
+## Rôles
+
+- `USER` : lecture, emprunt, réservation, notation
+- `LIBRARIAN` : + gestion catalogue, retours
+- `ADMIN` : accès complet
+</file>
+
+<file path="src/main/java/com/bookhub/BookHubApplication.java">
+package com.bookhub;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class BookHubApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(BookHubApplication.class, args);
+    }
+}
+</file>
+
+<file path="src/main/java/com/bookhub/config/SecurityConfig.java">
+package com.bookhub.config;
+
+import com.bookhub.security.JwtAuthFilter;
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
+import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
+
+/**
+ * Configuration principale de Spring Security.
+ * Définit les règles d'accès, le CORS, le JWT et l'encodage des mots de passe.
+ */
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity          // Permet @PreAuthorize dans les controllers
+@RequiredArgsConstructor
+public class SecurityConfig {
+
+    private final JwtAuthFilter jwtAuthFilter;
+    private final UserDetailsService userDetailsService;
+
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            .csrf(AbstractHttpConfigurer::disable)            // JWT = pas de CSRF
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .sessionManagement(session ->
+                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))   // Pas de session
+            .authorizeHttpRequests(auth -> auth
+                // Routes publiques
+                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/books").permitAll()
+                .requestMatchers("/api/books/{id}").permitAll()
+                .requestMatchers("/api/books/search").permitAll()
+                // Swagger
+                .requestMatchers("/swagger-ui/**", "/api-docs/**", "/swagger-ui.html").permitAll()
+                // Tout le reste nécessite une authentification
+                .anyRequest().authenticated()
+            )
+            .authenticationProvider(authenticationProvider())
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+
+    /** CORS : autorise les requêtes depuis le front Angular (port 4200) */
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(List.of("http://localhost:4200"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
+    }
+
+    @Bean
+    public AuthenticationProvider authenticationProvider() {
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
+        provider.setUserDetailsService(userDetailsService);
+        provider.setPasswordEncoder(passwordEncoder());
+        return provider;
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration config)
+            throws Exception {
+        return config.getAuthenticationManager();
+    }
+
+    /** BCrypt coût 12 comme demandé dans le cahier des charges */
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder(12);
+    }
+}
+</file>
+
+<file path="src/main/java/com/bookhub/config/SwaggerConfig.java">
+package com.bookhub.config;
+
+import io.swagger.v3.oas.models.Components;
+import io.swagger.v3.oas.models.OpenAPI;
+import io.swagger.v3.oas.models.info.Info;
+import io.swagger.v3.oas.models.security.SecurityScheme;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+/**
+ * Configuration de Swagger / OpenAPI.
+ * Accessible sur http://localhost:8080/swagger-ui.html
+ */
+@Configuration
+public class SwaggerConfig {
+
+    @Bean
+    public OpenAPI openAPI() {
+        return new OpenAPI()
+                .info(new Info()
+                        .title("BookHub API")
+                        .description("API REST de la plateforme de gestion de bibliothèque communautaire")
+                        .version("1.0"))
+                .components(new Components()
+                        .addSecuritySchemes("bearerAuth",
+                                new SecurityScheme()
+                                        .type(SecurityScheme.Type.HTTP)
+                                        .scheme("bearer")
+                                        .bearerFormat("JWT")));
+    }
+}
+</file>
+
+<file path="src/main/java/com/bookhub/controller/AuthController.java">
+package com.bookhub.controller;
+
+import com.bookhub.dto.auth.AuthResponse;
+import com.bookhub.dto.auth.LoginRequest;
+import com.bookhub.dto.auth.RegisterRequest;
+import com.bookhub.service.AuthService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+/**
+ * Contrôleur pour l'authentification (inscription / connexion).
+ * Routes publiques : /api/auth/register et /api/auth/login
+ */
+@RestController
+@RequestMapping("/api/auth")
+@RequiredArgsConstructor
+@Tag(name = "Authentification", description = "Inscription et connexion")
+public class AuthController {
+
+    private final AuthService authService;
+
+    @PostMapping("/register")
+    @Operation(summary = "Inscription d'un nouvel utilisateur")
+    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(authService.register(request));
+    }
+
+    @PostMapping("/login")
+    @Operation(summary = "Connexion et génération du token JWT")
+    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
+        return ResponseEntity.ok(authService.login(request));
+    }
+}
+</file>
+
+<file path="src/main/java/com/bookhub/controller/BookController.java">
+package com.bookhub.controller;
+
+import com.bookhub.dto.book.BookRequest;
+import com.bookhub.dto.book.BookResponse;
+import com.bookhub.service.BookService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+/**
+ * Contrôleur REST pour la gestion du catalogue de livres.
+ * GET publics — POST/PUT réservés LIBRARIAN — DELETE réservé ADMIN.
+ */
+@RestController
+@RequestMapping("/api/books")
+@RequiredArgsConstructor
+@Tag(name = "Catalogue", description = "Gestion des livres")
+public class BookController {
+
+    private final BookService bookService;
+
+    @GetMapping
+    @Operation(summary = "Liste paginée des livres (20/page)")
+    public ResponseEntity<Page<BookResponse>> getAll(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(defaultValue = "title") String sort) {
+        return ResponseEntity.ok(
+            bookService.findAll(PageRequest.of(page, size, Sort.by(sort)))
+        );
+    }
+
+    @GetMapping("/{id}")
+    @Operation(summary = "Détail d'un livre")
+    public ResponseEntity<BookResponse> getById(@PathVariable Long id) {
+        return ResponseEntity.ok(bookService.findById(id));
+    }
+
+    @GetMapping("/search")
+    @Operation(summary = "Recherche par titre, auteur ou ISBN")
+    public ResponseEntity<Page<BookResponse>> search(
+            @RequestParam String q,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(
+            bookService.search(q, PageRequest.of(page, size))
+        );
+    }
+
+    @PostMapping
+    @PreAuthorize("hasAnyRole('LIBRARIAN', 'ADMIN')")
+    @Operation(summary = "Ajouter un livre", security = @SecurityRequirement(name = "bearerAuth"))
+    public ResponseEntity<BookResponse> create(@Valid @RequestBody BookRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(bookService.create(request));
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('LIBRARIAN', 'ADMIN')")
+    @Operation(summary = "Modifier un livre", security = @SecurityRequirement(name = "bearerAuth"))
+    public ResponseEntity<BookResponse> update(@PathVariable Long id,
+                                               @Valid @RequestBody BookRequest request) {
+        return ResponseEntity.ok(bookService.update(id, request));
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Supprimer un livre (admin uniquement)", security = @SecurityRequirement(name = "bearerAuth"))
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        bookService.delete(id);
+        return ResponseEntity.noContent().build();
+    }
+}
+</file>
+
+<file path="src/main/java/com/bookhub/dto/auth/AuthResponse.java">
+package com.bookhub.dto.auth;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+
+@Data
+@Builder
+@AllArgsConstructor
+public class AuthResponse {
+    private String token;
+    private String email;
+    private String firstName;
+    private String lastName;
+    private String role;
+}
+</file>
+
+<file path="src/main/java/com/bookhub/dto/auth/LoginRequest.java">
+package com.bookhub.dto.auth;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import lombok.Data;
+
+@Data
+public class LoginRequest {
+
+    @Email @NotBlank
+    private String email;
+
+    @NotBlank
+    private String password;
+}
+</file>
+
+<file path="src/main/java/com/bookhub/dto/auth/RegisterRequest.java">
+package com.bookhub.dto.auth;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import lombok.Data;
+
+@Data
+public class RegisterRequest {
+
+    @NotBlank(message = "Le prénom est obligatoire")
+    private String firstName;
+
+    @NotBlank(message = "Le nom est obligatoire")
+    private String lastName;
+
+    @Email(message = "Format email invalide")
+    @NotBlank(message = "L'email est obligatoire")
+    private String email;
+
+    /** Politique : 12+ car, 1 maj, 1 min, 1 chiffre, 1 spécial */
+    @Pattern(
+        regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{12,}$",
+        message = "Mot de passe : 12+ caractères, 1 majuscule, 1 minuscule, 1 chiffre, 1 caractère spécial"
+    )
+    private String password;
+
+    private String phone;
+}
+</file>
+
+<file path="src/main/java/com/bookhub/dto/book/BookRequest.java">
+package com.bookhub.dto.book;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
+import lombok.Data;
+import java.time.LocalDate;
+
+@Data
+public class BookRequest {
+
+    @NotBlank(message = "Le titre est obligatoire")
+    private String title;
+
+    @NotBlank(message = "L'auteur est obligatoire")
+    private String author;
+
+    private String isbn;
+    private String description;
+    private String category;
+    private String coverUrl;
+    private LocalDate publishedDate;
+
+    @Positive(message = "Le nombre d'exemplaires doit être positif")
+    private int totalCopies = 1;
+}
+</file>
+
+<file path="src/main/java/com/bookhub/dto/book/BookResponse.java">
+package com.bookhub.dto.book;
+
+import lombok.Builder;
+import lombok.Data;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+@Data
+@Builder
+public class BookResponse {
+    private Long id;
+    private String title;
+    private String author;
+    private String isbn;
+    private String description;
+    private String category;
+    private String coverUrl;
+    private LocalDate publishedDate;
+    private int totalCopies;
+    private int availableCopies;
+    private boolean available;
+    private Double averageRating;
+    private LocalDateTime createdAt;
+}
+</file>
+
+<file path="src/main/java/com/bookhub/entity/Book.java">
+package com.bookhub.entity;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
+import lombok.*;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+/** Livre du catalogue BookHub. */
+@Entity
+@Table(name = "books")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class Book {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @NotBlank
+    @Column(nullable = false)
+    private String title;
+
+    @NotBlank
+    @Column(nullable = false)
+    private String author;
+
+    @Column(unique = true)
+    private String isbn;
+
+    @Column(columnDefinition = "NVARCHAR(2000)")
+    private String description;
+
+    private String category;
+    private String coverUrl;
+    private LocalDate publishedDate;
+
+    @Positive
+    @Column(nullable = false)
+    @Builder.Default
+    private int totalCopies = 1;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private int availableCopies = 1;
+
+    @Column(nullable = false, updatable = false)
+    @Builder.Default
+    private LocalDateTime createdAt = LocalDateTime.now();
+
+    public boolean isAvailable() { return availableCopies > 0; }
+}
+</file>
+
+<file path="src/main/java/com/bookhub/entity/Loan.java">
+package com.bookhub.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import java.time.LocalDate;
+
+/** Emprunt d'un livre par un utilisateur. */
+@Entity
+@Table(name = "loans")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class Loan {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "book_id", nullable = false)
+    private Book book;
+
+    @Column(nullable = false)
+    private LocalDate borrowedAt;
+
+    @Column(nullable = false)
+    private LocalDate dueDate;
+
+    private LocalDate returnedAt;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private LoanStatus status = LoanStatus.ACTIVE;
+
+    public boolean isOverdue() {
+        return status == LoanStatus.ACTIVE && LocalDate.now().isAfter(dueDate);
+    }
+}
+</file>
+
+<file path="src/main/java/com/bookhub/entity/LoanStatus.java">
+package com.bookhub.entity;
+public enum LoanStatus { ACTIVE, RETURNED, OVERDUE }
+</file>
+
+<file path="src/main/java/com/bookhub/entity/Rating.java">
+package com.bookhub.entity;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import lombok.*;
+import java.time.LocalDateTime;
+
+/** Note et commentaire d'un utilisateur sur un livre. */
+@Entity
+@Table(name = "ratings", uniqueConstraints = {
+    @UniqueConstraint(columnNames = {"user_id", "book_id"})
+})
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class Rating {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "book_id", nullable = false)
+    private Book book;
+
+    @Min(1) @Max(5)
+    @Column(nullable = false)
+    private int stars;
+
+    @Column(columnDefinition = "NVARCHAR(1000)")
+    private String comment;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private LocalDateTime createdAt = LocalDateTime.now();
+
+    private LocalDateTime updatedAt;
+}
+</file>
+
+<file path="src/main/java/com/bookhub/entity/Reservation.java">
+package com.bookhub.entity;
+
+import jakarta.persistence.*;
+import lombok.*;
+import java.time.LocalDateTime;
+
+/** Réservation d'un livre indisponible. */
+@Entity
+@Table(name = "reservations")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class Reservation {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "book_id", nullable = false)
+    private Book book;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private ReservationStatus status = ReservationStatus.WAITING;
+
+    @Column(nullable = false)
+    private int queuePosition;
+
+    @Column(nullable = false, updatable = false)
+    @Builder.Default
+    private LocalDateTime createdAt = LocalDateTime.now();
+}
+</file>
+
+<file path="src/main/java/com/bookhub/entity/ReservationStatus.java">
+package com.bookhub.entity;
+public enum ReservationStatus { WAITING, AVAILABLE, CANCELLED }
+</file>
+
+<file path="src/main/java/com/bookhub/entity/Role.java">
+package com.bookhub.entity;
+public enum Role { USER, LIBRARIAN, ADMIN }
+</file>
+
+<file path="src/main/java/com/bookhub/entity/User.java">
+package com.bookhub.entity;
+
+import jakarta.persistence.*;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import lombok.*;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+
+import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
+
+/** Utilisateur de BookHub. Implémente UserDetails pour Spring Security. */
+@Entity
+@Table(name = "users")
+@Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+public class User implements UserDetails {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @NotBlank
+    @Column(nullable = false)
+    private String firstName;
+
+    @NotBlank
+    @Column(nullable = false)
+    private String lastName;
+
+    @Email @NotBlank
+    @Column(nullable = false, unique = true)
+    private String email;
+
+    @NotBlank
+    @Column(nullable = false)
+    private String password;
+
+    private String phone;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    @Builder.Default
+    private Role role = Role.USER;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean active = true;
+
+    @Column(nullable = false, updatable = false)
+    @Builder.Default
+    private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Override public Collection<? extends GrantedAuthority> getAuthorities() {
+        return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
+    }
+    @Override public String getUsername() { return email; }
+    @Override public boolean isAccountNonExpired() { return true; }
+    @Override public boolean isAccountNonLocked() { return active; }
+    @Override public boolean isCredentialsNonExpired() { return true; }
+    @Override public boolean isEnabled() { return active; }
+}
+</file>
+
+<file path="src/main/java/com/bookhub/exception/ApiException.java">
+package com.bookhub.exception;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Gestionnaire global des exceptions de l'API.
+ * Retourne des réponses JSON structurées pour chaque type d'erreur.
+ */
+@RestControllerAdvice
+public class ApiException {
+
+    /** Erreurs de validation (@Valid) */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException ex) {
+        Map<String, String> errors = new HashMap<>();
+        ex.getBindingResult().getFieldErrors()
+                .forEach(e -> errors.put(e.getField(), e.getDefaultMessage()));
+        return buildResponse(HttpStatus.BAD_REQUEST, "Erreur de validation", errors);
+    }
+
+    /** Ressource non trouvée */
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleNotFound(ResourceNotFoundException ex) {
+        return buildResponse(HttpStatus.NOT_FOUND, ex.getMessage(), null);
+    }
+
+    /** Règle métier violée */
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<Map<String, Object>> handleBusiness(BusinessException ex) {
+        return buildResponse(HttpStatus.BAD_REQUEST, ex.getMessage(), null);
+    }
+
+    private ResponseEntity<Map<String, Object>> buildResponse(
+            HttpStatus status, String message, Object details) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", LocalDateTime.now().toString());
+        body.put("status", status.value());
+        body.put("message", message);
+        if (details != null) body.put("details", details);
+        return ResponseEntity.status(status).body(body);
+    }
+}
+</file>
+
+<file path="src/main/java/com/bookhub/exception/BusinessException.java">
+package com.bookhub.exception;
+
+public class BusinessException extends RuntimeException {
+    public BusinessException(String message) { super(message); }
+}
+</file>
+
+<file path="src/main/java/com/bookhub/exception/ResourceNotFoundException.java">
+package com.bookhub.exception;
+
+public class ResourceNotFoundException extends RuntimeException {
+    public ResourceNotFoundException(String message) { super(message); }
+}
+</file>
+
+<file path="src/main/java/com/bookhub/repository/BookRepository.java">
+package com.bookhub.repository;
+
+import com.bookhub.entity.Book;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+
+public interface BookRepository extends JpaRepository<Book, Long> {
+
+    /** Recherche insensible à la casse sur titre, auteur ou ISBN */
+    @Query("SELECT b FROM Book b WHERE " +
+           "LOWER(b.title) LIKE LOWER(CONCAT('%', :q, '%')) OR " +
+           "LOWER(b.author) LIKE LOWER(CONCAT('%', :q, '%')) OR " +
+           "LOWER(b.isbn) LIKE LOWER(CONCAT('%', :q, '%'))")
+    Page<Book> search(@Param("q") String query, Pageable pageable);
+
+    /** Filtre par catégorie */
+    Page<Book> findByCategory(String category, Pageable pageable);
+
+    /** Filtre par disponibilité */
+    Page<Book> findByAvailableCopiesGreaterThan(int copies, Pageable pageable);
+}
+</file>
+
+<file path="src/main/java/com/bookhub/repository/LoanRepository.java">
+package com.bookhub.repository;
+
+import com.bookhub.entity.Loan;
+import com.bookhub.entity.LoanStatus;
+import com.bookhub.entity.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.List;
+
+public interface LoanRepository extends JpaRepository<Loan, Long> {
+    List<Loan> findByUserAndStatus(User user, LoanStatus status);
+    List<Loan> findByUser(User user);
+    long countByUserAndStatus(User user, LoanStatus status);
+    boolean existsByUserAndBookIdAndStatus(User user, Long bookId, LoanStatus status);
+}
+</file>
+
+<file path="src/main/java/com/bookhub/repository/RatingRepository.java">
+package com.bookhub.repository;
+
+import com.bookhub.entity.Rating;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import java.util.List;
+import java.util.Optional;
+
+public interface RatingRepository extends JpaRepository<Rating, Long> {
+    List<Rating> findByBookId(Long bookId);
+    Optional<Rating> findByUserIdAndBookId(Long userId, Long bookId);
+
+    @Query("SELECT AVG(CAST(r.stars AS double)) FROM Rating r WHERE r.book.id = :bookId")
+    Double findAverageStarsByBookId(@Param("bookId") Long bookId);
+}
+</file>
+
+<file path="src/main/java/com/bookhub/repository/ReservationRepository.java">
+package com.bookhub.repository;
+
+import com.bookhub.entity.Reservation;
+import com.bookhub.entity.ReservationStatus;
+import com.bookhub.entity.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.List;
+
+public interface ReservationRepository extends JpaRepository<Reservation, Long> {
+    List<Reservation> findByUser(User user);
+    long countByUserAndStatus(User user, ReservationStatus status);
+    boolean existsByUserIdAndBookIdAndStatus(Long userId, Long bookId, ReservationStatus status);
+    List<Reservation> findByBookIdAndStatusOrderByQueuePosition(Long bookId, ReservationStatus status);
+}
+</file>
+
+<file path="src/main/java/com/bookhub/repository/UserRepository.java">
+package com.bookhub.repository;
+
+import com.bookhub.entity.User;
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.Optional;
+
+public interface UserRepository extends JpaRepository<User, Long> {
+    Optional<User> findByEmail(String email);
+    boolean existsByEmail(String email);
+}
+</file>
+
+<file path="src/main/java/com/bookhub/security/JwtAuthFilter.java">
+package com.bookhub.security;
+
+import jakarta.servlet.FilterChain;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.stereotype.Component;
+import org.springframework.web.filter.OncePerRequestFilter;
+
+import java.io.IOException;
+
+/**
+ * Filtre Spring Security qui intercepte chaque requête,
+ * lit le token JWT dans le header Authorization et authentifie l'utilisateur.
+ */
+@Component
+@RequiredArgsConstructor
+public class JwtAuthFilter extends OncePerRequestFilter {
+
+    private final JwtService jwtService;
+    private final UserDetailsService userDetailsService;
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request,
+                                    HttpServletResponse response,
+                                    FilterChain filterChain)
+            throws ServletException, IOException {
+
+        String authHeader = request.getHeader("Authorization");
+
+        // Si pas de token Bearer, on passe au filtre suivant
+        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        String jwt = authHeader.substring(7);
+        String email = jwtService.extractEmail(jwt);
+
+        // Si email extrait et pas encore authentifié dans le contexte
+        if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+            UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+
+            if (jwtService.isTokenValid(jwt, userDetails)) {
+                UsernamePasswordAuthenticationToken authToken =
+                        new UsernamePasswordAuthenticationToken(
+                                userDetails, null, userDetails.getAuthorities());
+                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                SecurityContextHolder.getContext().setAuthentication(authToken);
+            }
+        }
+
+        filterChain.doFilter(request, response);
+    }
+}
+</file>
+
+<file path="src/main/java/com/bookhub/security/JwtService.java">
+package com.bookhub.security;
+
+import io.jsonwebtoken.*;
+import io.jsonwebtoken.io.Decoders;
+import io.jsonwebtoken.security.Keys;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.stereotype.Service;
+
+import javax.crypto.SecretKey;
+import java.util.Date;
+import java.util.Map;
+
+/**
+ * Service de gestion des tokens JWT.
+ * Génère, valide et extrait les informations des tokens.
+ */
+@Service
+public class JwtService {
+
+    @Value("${jwt.secret}")
+    private String secret;
+
+    @Value("${jwt.expiration}")
+    private long expiration;
+
+    /** Génère un token JWT pour un utilisateur */
+    public String generateToken(UserDetails userDetails) {
+        return Jwts.builder()
+                .subject(userDetails.getUsername())
+                .claim("role", userDetails.getAuthorities().iterator().next().getAuthority())
+                .issuedAt(new Date())
+                .expiration(new Date(System.currentTimeMillis() + expiration))
+                .signWith(getSigningKey())
+                .compact();
+    }
+
+    /** Extrait l'email (subject) du token */
+    public String extractEmail(String token) {
+        return Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .getSubject();
+    }
+
+    /** Vérifie si le token est valide pour un utilisateur donné */
+    public boolean isTokenValid(String token, UserDetails userDetails) {
+        try {
+            String email = extractEmail(token);
+            return email.equals(userDetails.getUsername()) && !isTokenExpired(token);
+        } catch (JwtException e) {
+            return false;
+        }
+    }
+
+    private boolean isTokenExpired(String token) {
+        return Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .getExpiration()
+                .before(new Date());
+    }
+
+    private SecretKey getSigningKey() {
+        byte[] keyBytes = secret.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        return Keys.hmacShaKeyFor(keyBytes);
+    }
+}
+</file>
+
+<file path="src/main/java/com/bookhub/security/UserDetailsServiceImpl.java">
+package com.bookhub.security;
+
+import com.bookhub.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.stereotype.Service;
+
+/**
+ * Implémentation de UserDetailsService.
+ * Spring Security utilise ce service pour charger un utilisateur par son email.
+ */
+@Service
+@RequiredArgsConstructor
+public class UserDetailsServiceImpl implements UserDetailsService {
+
+    private final UserRepository userRepository;
+
+    @Override
+    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("Utilisateur non trouvé : " + email));
+    }
+}
+</file>
+
+<file path="src/main/java/com/bookhub/service/AuthService.java">
+package com.bookhub.service;
+
+import com.bookhub.dto.auth.AuthResponse;
+import com.bookhub.dto.auth.LoginRequest;
+import com.bookhub.dto.auth.RegisterRequest;
+import com.bookhub.entity.User;
+import com.bookhub.exception.BusinessException;
+import com.bookhub.repository.UserRepository;
+import com.bookhub.security.JwtService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+/**
+ * Service gérant l'inscription et la connexion des utilisateurs.
+ */
+@Service
+@RequiredArgsConstructor
+public class AuthService {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtService jwtService;
+    private final AuthenticationManager authenticationManager;
+
+    /**
+     * Inscription d'un nouvel utilisateur.
+     * Vérifie l'unicité de l'email, hache le mot de passe, attribue le rôle USER.
+     */
+    public AuthResponse register(RegisterRequest request) {
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new BusinessException("Cet email est déjà utilisé");
+        }
+
+        User user = User.builder()
+                .firstName(request.getFirstName())
+                .lastName(request.getLastName())
+                .email(request.getEmail())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .phone(request.getPhone())
+                .build();
+
+        userRepository.save(user);
+
+        String token = jwtService.generateToken(user);
+        return buildAuthResponse(user, token);
+    }
+
+    /**
+     * Connexion d'un utilisateur existant.
+     * Spring Security vérifie les credentials, on retourne un token JWT.
+     */
+    public AuthResponse login(LoginRequest request) {
+        authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+        );
+
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new BusinessException("Utilisateur non trouvé"));
+
+        String token = jwtService.generateToken(user);
+        return buildAuthResponse(user, token);
+    }
+
+    private AuthResponse buildAuthResponse(User user, String token) {
+        return AuthResponse.builder()
+                .token(token)
+                .email(user.getEmail())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .role(user.getRole().name())
+                .build();
+    }
+}
+</file>
+
+<file path="src/main/java/com/bookhub/service/BookService.java">
+package com.bookhub.service;
+
+import com.bookhub.dto.book.BookRequest;
+import com.bookhub.dto.book.BookResponse;
+import com.bookhub.entity.Book;
+import com.bookhub.exception.BusinessException;
+import com.bookhub.exception.ResourceNotFoundException;
+import com.bookhub.repository.BookRepository;
+import com.bookhub.repository.LoanRepository;
+import com.bookhub.repository.RatingRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Service de gestion du catalogue de livres.
+ */
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class BookService {
+
+    private final BookRepository bookRepository;
+    private final LoanRepository loanRepository;
+    private final RatingRepository ratingRepository;
+
+    /** Liste paginée de tous les livres */
+    public Page<BookResponse> findAll(Pageable pageable) {
+        return bookRepository.findAll(pageable).map(this::toResponse);
+    }
+
+    /** Détail d'un livre par son ID */
+    public BookResponse findById(Long id) {
+        return bookRepository.findById(id)
+                .map(this::toResponse)
+                .orElseThrow(() -> new ResourceNotFoundException("Livre non trouvé : " + id));
+    }
+
+    /** Recherche textuelle */
+    public Page<BookResponse> search(String query, Pageable pageable) {
+        return bookRepository.search(query, pageable).map(this::toResponse);
+    }
+
+    /** Création d'un livre (bibliothécaire) */
+    @Transactional
+    public BookResponse create(BookRequest request) {
+        Book book = Book.builder()
+                .title(request.getTitle())
+                .author(request.getAuthor())
+                .isbn(request.getIsbn())
+                .description(request.getDescription())
+                .category(request.getCategory())
+                .coverUrl(request.getCoverUrl())
+                .publishedDate(request.getPublishedDate())
+                .totalCopies(request.getTotalCopies())
+                .availableCopies(request.getTotalCopies())
+                .build();
+        return toResponse(bookRepository.save(book));
+    }
+
+    /** Mise à jour d'un livre (bibliothécaire) */
+    @Transactional
+    public BookResponse update(Long id, BookRequest request) {
+        Book book = bookRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Livre non trouvé : " + id));
+
+        book.setTitle(request.getTitle());
+        book.setAuthor(request.getAuthor());
+        book.setIsbn(request.getIsbn());
+        book.setDescription(request.getDescription());
+        book.setCategory(request.getCategory());
+        book.setCoverUrl(request.getCoverUrl());
+        book.setPublishedDate(request.getPublishedDate());
+
+        return toResponse(bookRepository.save(book));
+    }
+
+    /** Suppression d'un livre — interdit s'il est en cours d'emprunt */
+    @Transactional
+    public void delete(Long id) {
+        Book book = bookRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Livre non trouvé : " + id));
+
+        if (book.getAvailableCopies() < book.getTotalCopies()) {
+            throw new BusinessException("Impossible de supprimer un livre actuellement emprunté");
+        }
+
+        bookRepository.delete(book);
+    }
+
+    /** Convertit une entité Book en DTO de réponse */
+    private BookResponse toResponse(Book book) {
+        Double avgRating = ratingRepository.findAverageStarsByBookId(book.getId());
+        return BookResponse.builder()
+                .id(book.getId())
+                .title(book.getTitle())
+                .author(book.getAuthor())
+                .isbn(book.getIsbn())
+                .description(book.getDescription())
+                .category(book.getCategory())
+                .coverUrl(book.getCoverUrl())
+                .publishedDate(book.getPublishedDate())
+                .totalCopies(book.getTotalCopies())
+                .availableCopies(book.getAvailableCopies())
+                .available(book.isAvailable())
+                .averageRating(avgRating)
+                .createdAt(book.getCreatedAt())
+                .build();
+    }
+}
+</file>
+
+<file path="src/test/java/com/bookhub/BookHubApplicationTests.java">
+package com.bookhub;
+
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
+
+@SpringBootTest
+@ActiveProfiles("test")
+class BookHubApplicationTests {
+
+    @Test
+    void contextLoads() {
+        // Vérifie que le contexte Spring Boot démarre sans erreur
+    }
+}
+</file>
+
+<file path=".gitattributes">
+/gradlew text eol=lf
+*.bat text eol=crlf
+*.jar binary
+</file>
+
+<file path=".gitignore">
+HELP.md
+.gradle
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### VS Code ###
+.vscode/
+</file>
+
+<file path="build.gradle">
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.4.1'
+    id 'io.spring.dependency-management' version '1.1.7'
+}
+
+group = 'com.bookhub'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    sourceCompatibility = '17'
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // Spring Boot
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+
+    // SQL Server
+    runtimeOnly 'com.microsoft.sqlserver:mssql-jdbc:12.8.1.jre11'
+
+    // JWT
+    implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+    runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+
+    // Lombok
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    // Swagger / OpenAPI
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.4'
+
+
+    // Tests
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.springframework.security:spring-security-test'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+</file>
+
+<file path="gradle/wrapper/gradle-wrapper.properties">
+distributionBase=GRADLE_USER_HOME
+distributionPath=wrapper/dists
+distributionUrl=https\://services.gradle.org/distributions/gradle-9.4.1-bin.zip
+networkTimeout=10000
+validateDistributionUrl=true
+zipStoreBase=GRADLE_USER_HOME
+zipStorePath=wrapper/dists
+</file>
+
+<file path="gradlew">
+#!/bin/sh
+
+#
+# Copyright © 2015 the original authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+##############################################################################
+#
+#   Gradle start up script for POSIX generated by Gradle.
+#
+#   Important for running:
+#
+#   (1) You need a POSIX-compliant shell to run this script. If your /bin/sh is
+#       noncompliant, but you have some other compliant shell such as ksh or
+#       bash, then to run this script, type that shell name before the whole
+#       command line, like:
+#
+#           ksh Gradle
+#
+#       Busybox and similar reduced shells will NOT work, because this script
+#       requires all of these POSIX shell features:
+#         * functions;
+#         * expansions «$var», «${var}», «${var:-default}», «${var+SET}»,
+#           «${var#prefix}», «${var%suffix}», and «$( cmd )»;
+#         * compound commands having a testable exit status, especially «case»;
+#         * various built-in commands including «command», «set», and «ulimit».
+#
+#   Important for patching:
+#
+#   (2) This script targets any POSIX shell, so it avoids extensions provided
+#       by Bash, Ksh, etc; in particular arrays are avoided.
+#
+#       The "traditional" practice of packing multiple parameters into a
+#       space-separated string is a well documented source of bugs and security
+#       problems, so this is (mostly) avoided, by progressively accumulating
+#       options in "$@", and eventually passing that to Java.
+#
+#       Where the inherited environment variables (DEFAULT_JVM_OPTS, JAVA_OPTS,
+#       and GRADLE_OPTS) rely on word-splitting, this is performed explicitly;
+#       see the in-line comments for details.
+#
+#       There are tweaks for specific operating systems such as AIX, CygWin,
+#       Darwin, MinGW, and NonStop.
+#
+#   (3) This script is generated from the Groovy template
+#       https://github.com/gradle/gradle/blob/2d6327017519d23b96af35865dc997fcb544fb40/platforms/jvm/plugins-application/src/main/resources/org/gradle/api/internal/plugins/unixStartScript.txt
+#       within the Gradle project.
+#
+#       You can find Gradle at https://github.com/gradle/gradle/.
+#
+##############################################################################
+
+# Attempt to set APP_HOME
+
+# Resolve links: $0 may be a link
+app_path=$0
+
+# Need this for daisy-chained symlinks.
+while
+    APP_HOME=${app_path%"${app_path##*/}"}  # leaves a trailing /; empty if no leading path
+    [ -h "$app_path" ]
+do
+    ls=$( ls -ld "$app_path" )
+    link=${ls#*' -> '}
+    case $link in             #(
+      /*)   app_path=$link ;; #(
+      *)    app_path=$APP_HOME$link ;;
+    esac
+done
+
+# This is normally unused
+# shellcheck disable=SC2034
+APP_BASE_NAME=${0##*/}
+# Discard cd standard output in case $CDPATH is set (https://github.com/gradle/gradle/issues/25036)
+APP_HOME=$( cd -P "${APP_HOME:-./}" > /dev/null && printf '%s\n' "$PWD" ) || exit
+
+# Use the maximum available, or set MAX_FD != -1 to use that value.
+MAX_FD=maximum
+
+warn () {
+    echo "$*"
+} >&2
+
+die () {
+    echo
+    echo "$*"
+    echo
+    exit 1
+} >&2
+
+# OS specific support (must be 'true' or 'false').
+cygwin=false
+msys=false
+darwin=false
+nonstop=false
+case "$( uname )" in                #(
+  CYGWIN* )         cygwin=true  ;; #(
+  Darwin* )         darwin=true  ;; #(
+  MSYS* | MINGW* )  msys=true    ;; #(
+  NONSTOP* )        nonstop=true ;;
+esac
+
+
+
+# Determine the Java command to use to start the JVM.
+if [ -n "$JAVA_HOME" ] ; then
+    if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
+        # IBM's JDK on AIX uses strange locations for the executables
+        JAVACMD=$JAVA_HOME/jre/sh/java
+    else
+        JAVACMD=$JAVA_HOME/bin/java
+    fi
+    if [ ! -x "$JAVACMD" ] ; then
+        die "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME
+
+Please set the JAVA_HOME variable in your environment to match the
+location of your Java installation."
+    fi
+else
+    JAVACMD=java
+    if ! command -v java >/dev/null 2>&1
+    then
+        die "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH.
+
+Please set the JAVA_HOME variable in your environment to match the
+location of your Java installation."
+    fi
+fi
+
+# Increase the maximum file descriptors if we can.
+if ! "$cygwin" && ! "$darwin" && ! "$nonstop" ; then
+    case $MAX_FD in #(
+      max*)
+        # In POSIX sh, ulimit -H is undefined. That's why the result is checked to see if it worked.
+        # shellcheck disable=SC2039,SC3045
+        MAX_FD=$( ulimit -H -n ) ||
+            warn "Could not query maximum file descriptor limit"
+    esac
+    case $MAX_FD in  #(
+      '' | soft) :;; #(
+      *)
+        # In POSIX sh, ulimit -n is undefined. That's why the result is checked to see if it worked.
+        # shellcheck disable=SC2039,SC3045
+        ulimit -n "$MAX_FD" ||
+            warn "Could not set maximum file descriptor limit to $MAX_FD"
+    esac
+fi
+
+# Collect all arguments for the java command, stacking in reverse order:
+#   * args from the command line
+#   * the main class name
+#   * -classpath
+#   * -D...appname settings
+#   * --module-path (only if needed)
+#   * DEFAULT_JVM_OPTS, JAVA_OPTS, and GRADLE_OPTS environment variables.
+
+# For Cygwin or MSYS, switch paths to Windows format before running java
+if "$cygwin" || "$msys" ; then
+    APP_HOME=$( cygpath --path --mixed "$APP_HOME" )
+
+    JAVACMD=$( cygpath --unix "$JAVACMD" )
+
+    # Now convert the arguments - kludge to limit ourselves to /bin/sh
+    for arg do
+        if
+            case $arg in                                #(
+              -*)   false ;;                            # don't mess with options #(
+              /?*)  t=${arg#/} t=/${t%%/*}              # looks like a POSIX filepath
+                    [ -e "$t" ] ;;                      #(
+              *)    false ;;
+            esac
+        then
+            arg=$( cygpath --path --ignore --mixed "$arg" )
+        fi
+        # Roll the args list around exactly as many times as the number of
+        # args, so each arg winds up back in the position where it started, but
+        # possibly modified.
+        #
+        # NB: a `for` loop captures its iteration list before it begins, so
+        # changing the positional parameters here affects neither the number of
+        # iterations, nor the values presented in `arg`.
+        shift                   # remove old arg
+        set -- "$@" "$arg"      # push replacement arg
+    done
+fi
+
+
+# Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
+DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
+
+# Collect all arguments for the java command:
+#   * DEFAULT_JVM_OPTS, JAVA_OPTS, and optsEnvironmentVar are not allowed to contain shell fragments,
+#     and any embedded shellness will be escaped.
+#   * For example: A user cannot expect ${Hostname} to be expanded, as it is an environment variable and will be
+#     treated as '${Hostname}' itself on the command line.
+
+set -- \
+        "-Dorg.gradle.appname=$APP_BASE_NAME" \
+        -jar "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" \
+        "$@"
+
+# Stop when "xargs" is not available.
+if ! command -v xargs >/dev/null 2>&1
+then
+    die "xargs is not available"
+fi
+
+# Use "xargs" to parse quoted args.
+#
+# With -n1 it outputs one arg per line, with the quotes and backslashes removed.
+#
+# In Bash we could simply go:
+#
+#   readarray ARGS < <( xargs -n1 <<<"$var" ) &&
+#   set -- "${ARGS[@]}" "$@"
+#
+# but POSIX shell has neither arrays nor command substitution, so instead we
+# post-process each arg (as a line of input to sed) to backslash-escape any
+# character that might be a shell metacharacter, then use eval to reverse
+# that process (while maintaining the separation between arguments), and wrap
+# the whole thing up as a single "set" statement.
+#
+# This will of course break if any of these variables contains a newline or
+# an unmatched quote.
+#
+
+eval "set -- $(
+        printf '%s\n' "$DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS" |
+        xargs -n1 |
+        sed ' s~[^-[:alnum:]+,./:=@_]~\\&~g; ' |
+        tr '\n' ' '
+    )" '"$@"'
+
+exec "$JAVACMD" "$@"
+</file>
+
+<file path="gradlew.bat">
+@rem
+@rem Copyright 2015 the original author or authors.
+@rem
+@rem Licensed under the Apache License, Version 2.0 (the "License");
+@rem you may not use this file except in compliance with the License.
+@rem You may obtain a copy of the License at
+@rem
+@rem      https://www.apache.org/licenses/LICENSE-2.0
+@rem
+@rem Unless required by applicable law or agreed to in writing, software
+@rem distributed under the License is distributed on an "AS IS" BASIS,
+@rem WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+@rem See the License for the specific language governing permissions and
+@rem limitations under the License.
+@rem
+@rem SPDX-License-Identifier: Apache-2.0
+@rem
+
+@if "%DEBUG%"=="" @echo off
+@rem ##########################################################################
+@rem
+@rem  Gradle startup script for Windows
+@rem
+@rem ##########################################################################
+
+@rem Set local scope for the variables with windows NT shell
+if "%OS%"=="Windows_NT" setlocal
+
+set DIRNAME=%~dp0
+if "%DIRNAME%"=="" set DIRNAME=.
+@rem This is normally unused
+set APP_BASE_NAME=%~n0
+set APP_HOME=%DIRNAME%
+
+@rem Resolve any "." and ".." in APP_HOME to make it shorter.
+for %%i in ("%APP_HOME%") do set APP_HOME=%%~fi
+
+@rem Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
+set DEFAULT_JVM_OPTS="-Xmx64m" "-Xms64m"
+
+@rem Find java.exe
+if defined JAVA_HOME goto findJavaFromJavaHome
+
+set JAVA_EXE=java.exe
+%JAVA_EXE% -version >NUL 2>&1
+if %ERRORLEVEL% equ 0 goto execute
+
+echo. 1>&2
+echo ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH. 1>&2
+echo. 1>&2
+echo Please set the JAVA_HOME variable in your environment to match the 1>&2
+echo location of your Java installation. 1>&2
+
+goto fail
+
+:findJavaFromJavaHome
+set JAVA_HOME=%JAVA_HOME:"=%
+set JAVA_EXE=%JAVA_HOME%/bin/java.exe
+
+if exist "%JAVA_EXE%" goto execute
+
+echo. 1>&2
+echo ERROR: JAVA_HOME is set to an invalid directory: %JAVA_HOME% 1>&2
+echo. 1>&2
+echo Please set the JAVA_HOME variable in your environment to match the 1>&2
+echo location of your Java installation. 1>&2
+
+goto fail
+
+:execute
+@rem Setup the command line
+
+
+
+@rem Execute Gradle
+"%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -jar "%APP_HOME%\gradle\wrapper\gradle-wrapper.jar" %*
+
+:end
+@rem End local scope for the variables with windows NT shell
+if %ERRORLEVEL% equ 0 goto mainEnd
+
+:fail
+rem Set variable GRADLE_EXIT_CONSOLE if you need the _script_ return code instead of
+rem the _cmd.exe /c_ return code!
+set EXIT_CODE=%ERRORLEVEL%
+if %EXIT_CODE% equ 0 set EXIT_CODE=1
+if not ""=="%GRADLE_EXIT_CONSOLE%" exit %EXIT_CODE%
+exit /b %EXIT_CODE%
+
+:mainEnd
+if "%OS%"=="Windows_NT" endlocal
+
+:omega
+</file>
+
+<file path="settings.gradle">
+rootProject.name = 'book-hub-back'
+</file>
+
+<file path="src/main/resources/application.properties">
+# ================================
+# Configuration generale
+# ================================
+spring.application.name=book-hub-back
+server.port=8080
+
+# ================================
+# Base de donnees SQL Server
+# ================================
+# Remplace 'localhost' par ton serveur, 'BookHub' par le nom de ta base
+spring.datasource.url=jdbc:sqlserver://localhost:1433;databaseName=BookHub;encrypt=false;trustServerCertificate=true
+spring.datasource.username=sa
+spring.datasource.password=Pa$$w0rd
+spring.datasource.driver-class-name=com.microsoft.sqlserver.jdbc.SQLServerDriver
+
+# ================================
+# JPA / Hibernate
+# ================================
+# 'update' = cree/modifie les tables automatiquement (pratique en dev)
+# En production, utiliser 'validate' ou Flyway
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.format_sql=true
+spring.jpa.database-platform=org.hibernate.dialect.SQLServerDialect
+
+# ================================
+# JWT
+# ================================
+# Secret de 256 bits minimum (change cette valeur !)
+jwt.secret=BookHubSecretKeyPourSignerLesTokensJWT2024MinimumSixteenBytes256bits
+jwt.expiration=86400000
+
+# ================================
+# Swagger
+# ================================
+springdoc.api-docs.path=/api-docs
+springdoc.swagger-ui.path=/swagger-ui.html
+springdoc.swagger-ui.enabled=true
+
+# ================================
+# Logs
+# ================================
+logging.level.com.bookhub=DEBUG
+logging.level.org.springframework.security=DEBUG
+</file>
+
+</files>
