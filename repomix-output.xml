@@ -54,11 +54,24 @@ src/main/java/com/bookhub/config/SecurityConfig.java
 src/main/java/com/bookhub/config/SwaggerConfig.java
 src/main/java/com/bookhub/controller/AuthController.java
 src/main/java/com/bookhub/controller/BookController.java
+src/main/java/com/bookhub/controller/LoanController.java
+src/main/java/com/bookhub/controller/RatingController.java
+src/main/java/com/bookhub/controller/ReservationController.java
+src/main/java/com/bookhub/controller/UserController.java
 src/main/java/com/bookhub/dto/auth/AuthResponse.java
 src/main/java/com/bookhub/dto/auth/LoginRequest.java
 src/main/java/com/bookhub/dto/auth/RegisterRequest.java
 src/main/java/com/bookhub/dto/book/BookRequest.java
 src/main/java/com/bookhub/dto/book/BookResponse.java
+src/main/java/com/bookhub/dto/dashboard/LibrarianDashboardResponse.java
+src/main/java/com/bookhub/dto/dashboard/ReaderDashboardResponse.java
+src/main/java/com/bookhub/dto/loan/LoanResponse.java
+src/main/java/com/bookhub/dto/rating/RatingRequest.java
+src/main/java/com/bookhub/dto/rating/RatingResponse.java
+src/main/java/com/bookhub/dto/reservation/ReservationResponse.java
+src/main/java/com/bookhub/dto/user/ChangePasswordRequest.java
+src/main/java/com/bookhub/dto/user/UpdateProfileRequest.java
+src/main/java/com/bookhub/dto/user/UserResponse.java
 src/main/java/com/bookhub/entity/Book.java
 src/main/java/com/bookhub/entity/Loan.java
 src/main/java/com/bookhub/entity/LoanStatus.java
@@ -79,13 +92,1153 @@ src/main/java/com/bookhub/security/JwtAuthFilter.java
 src/main/java/com/bookhub/security/JwtService.java
 src/main/java/com/bookhub/security/UserDetailsServiceImpl.java
 src/main/java/com/bookhub/service/AuthService.java
+src/main/java/com/bookhub/service/AuthServiceTest.java
 src/main/java/com/bookhub/service/BookService.java
+src/main/java/com/bookhub/service/BookServiceTest.java
+src/main/java/com/bookhub/service/DashboardService.java
+src/main/java/com/bookhub/service/LoanService.java
+src/main/java/com/bookhub/service/RatingService.java
+src/main/java/com/bookhub/service/ReservationService.java
+src/main/java/com/bookhub/service/UserService.java
 src/main/resources/application.properties
 src/test/java/com/bookhub/BookHubApplicationTests.java
 </directory_structure>
 
 <files>
 This section contains the contents of the repository's files.
+
+<file path="src/main/java/com/bookhub/controller/RatingController.java">
+package com.bookhub.controller;
+
+import com.bookhub.dto.rating.RatingRequest;
+import com.bookhub.dto.rating.RatingResponse;
+import com.bookhub.service.RatingService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+/**
+ * POST   /api/books/{id}/ratings   → noter un livre
+ * GET    /api/books/{id}/ratings   → avis d'un livre (public)
+ * DELETE /api/ratings/{id}         → supprimer un avis
+ */
+@RestController
+@RequiredArgsConstructor
+@Tag(name = "Notations", description = "Notes et commentaires sur les livres")
+public class RatingController {
+
+    private final RatingService ratingService;
+
+    @PostMapping("/api/books/{bookId}/ratings")
+    @Operation(summary = "Noter et commenter un livre (après l'avoir emprunté)")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<RatingResponse> rateBook(
+            @PathVariable Long bookId,
+            @Valid @RequestBody RatingRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ratingService.rateBook(bookId, request));
+    }
+
+    @GetMapping("/api/books/{bookId}/ratings")
+    @Operation(summary = "Consulter les avis d'un livre")
+    public ResponseEntity<List<RatingResponse>> getBookRatings(@PathVariable Long bookId) {
+        return ResponseEntity.ok(ratingService.getBookRatings(bookId));
+    }
+
+    @DeleteMapping("/api/ratings/{id}")
+    @Operation(summary = "Supprimer un avis (le sien ou modération bibliothécaire)")
+    @SecurityRequirement(name = "bearerAuth")
+    public ResponseEntity<Void> deleteRating(@PathVariable Long id) {
+        ratingService.deleteRating(id);
+        return ResponseEntity.noContent().build();
+    }
+}
+</file>
+
+<file path="src/main/java/com/bookhub/dto/dashboard/LibrarianDashboardResponse.java">
+package com.bookhub.dto.dashboard;
+
+import com.bookhub.dto.loan.LoanResponse;
+import lombok.Builder;
+import lombok.Data;
+import java.util.List;
+import java.util.Map;
+
+@Data
+@Builder
+public class LibrarianDashboardResponse {
+    private long totalBooks;
+    private long totalUsers;
+    private long activeLoans;
+    private long overdueLoans;
+    private List<LoanResponse> overdueList;
+    private List<Map<String, Object>> topBooks;   // titre + nb emprunts
+}
+</file>
+
+<file path="src/main/java/com/bookhub/dto/dashboard/ReaderDashboardResponse.java">
+package com.bookhub.dto.dashboard;
+
+import com.bookhub.dto.loan.LoanResponse;
+import com.bookhub.dto.reservation.ReservationResponse;
+import lombok.Builder;
+import lombok.Data;
+import java.util.List;
+
+@Data
+@Builder
+public class ReaderDashboardResponse {
+    private int totalBooksRead;
+    private int activeLoans;
+    private int overdueLoans;
+    private int activeReservations;
+    private List<LoanResponse> currentLoans;
+    private List<ReservationResponse> currentReservations;
+}
+</file>
+
+<file path="src/main/java/com/bookhub/dto/rating/RatingRequest.java">
+package com.bookhub.dto.rating;
+
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
+import lombok.Data;
+
+@Data
+public class RatingRequest {
+
+    @NotNull(message = "La note est obligatoire")
+    @Min(value = 1, message = "La note minimum est 1")
+    @Max(value = 5, message = "La note maximum est 5")
+    private Integer stars;
+
+    @Size(max = 1000, message = "Le commentaire ne peut pas dépasser 1000 caractères")
+    private String comment;
+}
+</file>
+
+<file path="src/main/java/com/bookhub/dto/rating/RatingResponse.java">
+package com.bookhub.dto.rating;
+
+import lombok.Builder;
+import lombok.Data;
+import java.time.LocalDateTime;
+
+@Data
+@Builder
+public class RatingResponse {
+    private Long id;
+    private Long bookId;
+    private String bookTitle;
+    private Long userId;
+    private String userFirstName;
+    private String userLastName;
+    private int stars;
+    private String comment;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+}
+</file>
+
+<file path="src/main/java/com/bookhub/service/AuthServiceTest.java">
+package com.bookhub.service;
+
+import com.bookhub.dto.auth.LoginRequest;
+import com.bookhub.dto.auth.RegisterRequest;
+import com.bookhub.entity.Role;
+import com.bookhub.entity.User;
+import com.bookhub.exception.BusinessException;
+import com.bookhub.repository.UserRepository;
+import com.bookhub.security.JwtService;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.crypto.password.PasswordEncoder;
+
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.*;
+
+/**
+ * Tests unitaires du service d'authentification.
+ * Couverture ciblée : inscription, connexion, cas d'erreur.
+ */
+@ExtendWith(MockitoExtension.class)
+class AuthServiceTest {
+
+    @Mock private UserRepository userRepository;
+    @Mock private PasswordEncoder passwordEncoder;
+    @Mock private JwtService jwtService;
+    @Mock private AuthenticationManager authenticationManager;
+
+    @InjectMocks
+    private AuthService authService;
+
+    private RegisterRequest registerRequest;
+    private User savedUser;
+
+    @BeforeEach
+    void setUp() {
+        registerRequest = new RegisterRequest();
+        registerRequest.setFirstName("Jean");
+        registerRequest.setLastName("Dupont");
+        registerRequest.setEmail("jean.dupont@example.com");
+        registerRequest.setPassword("MonMotDePasse1!");
+        registerRequest.setPhone("0612345678");
+
+        savedUser = User.builder()
+                .id(1L)
+                .firstName("Jean")
+                .lastName("Dupont")
+                .email("jean.dupont@example.com")
+                .password("hashed_password")
+                .role(Role.USER)
+                .build();
+    }
+
+    // ---- INSCRIPTION ----
+
+    @Test
+    @DisplayName("Inscription réussie → retourne token et infos utilisateur")
+    void register_success() {
+        when(userRepository.existsByEmail(anyString())).thenReturn(false);
+        when(passwordEncoder.encode(anyString())).thenReturn("hashed_password");
+        when(userRepository.save(any(User.class))).thenReturn(savedUser);
+        when(jwtService.generateToken(any())).thenReturn("jwt_token");
+
+        var response = authService.register(registerRequest);
+
+        assertThat(response.getToken()).isEqualTo("jwt_token");
+        assertThat(response.getEmail()).isEqualTo("jean.dupont@example.com");
+        assertThat(response.getRole()).isEqualTo("USER");
+        verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    @DisplayName("Inscription échoue si email déjà utilisé")
+    void register_emailAlreadyExists_throwsBusinessException() {
+        when(userRepository.existsByEmail("jean.dupont@example.com")).thenReturn(true);
+
+        assertThatThrownBy(() -> authService.register(registerRequest))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("email");
+
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Inscription encode le mot de passe avant sauvegarde")
+    void register_passwordIsEncoded() {
+        when(userRepository.existsByEmail(anyString())).thenReturn(false);
+        when(passwordEncoder.encode("MonMotDePasse1!")).thenReturn("bcrypt_hash");
+        when(userRepository.save(any(User.class))).thenAnswer(inv -> {
+            User u = inv.getArgument(0);
+            assertThat(u.getPassword()).isEqualTo("bcrypt_hash");
+            return savedUser;
+        });
+        when(jwtService.generateToken(any())).thenReturn("token");
+
+        authService.register(registerRequest);
+
+        verify(passwordEncoder).encode("MonMotDePasse1!");
+    }
+
+    // ---- CONNEXION ----
+
+    @Test
+    @DisplayName("Connexion réussie → retourne token JWT")
+    void login_success() {
+        LoginRequest loginRequest = new LoginRequest();
+        loginRequest.setEmail("jean.dupont@example.com");
+        loginRequest.setPassword("MonMotDePasse1!");
+
+        when(userRepository.findByEmail("jean.dupont@example.com"))
+                .thenReturn(Optional.of(savedUser));
+        when(jwtService.generateToken(savedUser)).thenReturn("jwt_token");
+
+        var response = authService.login(loginRequest);
+
+        assertThat(response.getToken()).isEqualTo("jwt_token");
+        assertThat(response.getEmail()).isEqualTo("jean.dupont@example.com");
+        verify(authenticationManager).authenticate(any(UsernamePasswordAuthenticationToken.class));
+    }
+
+    @Test
+    @DisplayName("Le rôle est bien inclus dans la réponse")
+    void login_roleIncludedInResponse() {
+        LoginRequest loginRequest = new LoginRequest();
+        loginRequest.setEmail("jean.dupont@example.com");
+        loginRequest.setPassword("MonMotDePasse1!");
+
+        when(userRepository.findByEmail(anyString())).thenReturn(Optional.of(savedUser));
+        when(jwtService.generateToken(any())).thenReturn("token");
+
+        var response = authService.login(loginRequest);
+
+        assertThat(response.getRole()).isEqualTo("USER");
+        assertThat(response.getFirstName()).isEqualTo("Jean");
+        assertThat(response.getLastName()).isEqualTo("Dupont");
+    }
+}
+</file>
+
+<file path="src/main/java/com/bookhub/service/BookServiceTest.java">
+package com.bookhub.service;
+
+import com.bookhub.dto.book.BookRequest;
+import com.bookhub.entity.Book;
+import com.bookhub.exception.BusinessException;
+import com.bookhub.exception.ResourceNotFoundException;
+import com.bookhub.repository.BookRepository;
+import com.bookhub.repository.LoanRepository;
+import com.bookhub.repository.RatingRepository;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+
+import java.util.List;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+/**
+ * Tests unitaires du service de gestion du catalogue.
+ */
+@ExtendWith(MockitoExtension.class)
+class BookServiceTest {
+
+    @Mock private BookRepository bookRepository;
+    @Mock private LoanRepository loanRepository;
+    @Mock private RatingRepository ratingRepository;
+
+    @InjectMocks
+    private BookService bookService;
+
+    private Book book;
+    private BookRequest bookRequest;
+
+    @BeforeEach
+    void setUp() {
+        book = Book.builder()
+                .id(1L)
+                .title("Clean Code")
+                .author("Robert C. Martin")
+                .isbn("978-0132350884")
+                .totalCopies(3)
+                .availableCopies(3)
+                .build();
+
+        bookRequest = new BookRequest();
+        bookRequest.setTitle("Clean Code");
+        bookRequest.setAuthor("Robert C. Martin");
+        bookRequest.setIsbn("978-0132350884");
+        bookRequest.setTotalCopies(3);
+    }
+
+    // ---- findById ----
+
+    @Test
+    @DisplayName("findById retourne le livre si trouvé")
+    void findById_found() {
+        when(bookRepository.findById(1L)).thenReturn(Optional.of(book));
+        when(ratingRepository.findAverageStarsByBookId(1L)).thenReturn(4.5);
+
+        var response = bookService.findById(1L);
+
+        assertThat(response.getTitle()).isEqualTo("Clean Code");
+        assertThat(response.getAuthor()).isEqualTo("Robert C. Martin");
+        assertThat(response.getAverageRating()).isEqualTo(4.5);
+    }
+
+    @Test
+    @DisplayName("findById lance ResourceNotFoundException si livre absent")
+    void findById_notFound_throwsException() {
+        when(bookRepository.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> bookService.findById(99L))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("99");
+    }
+
+    // ---- create ----
+
+    @Test
+    @DisplayName("create sauvegarde le livre avec availableCopies = totalCopies")
+    void create_setsAvailableCopiesEqualToTotal() {
+        when(bookRepository.save(any(Book.class))).thenAnswer(inv -> {
+            Book b = inv.getArgument(0);
+            b.setId(1L);
+            return b;
+        });
+        when(ratingRepository.findAverageStarsByBookId(any())).thenReturn(null);
+
+        var response = bookService.create(bookRequest);
+
+        assertThat(response.getTotalCopies()).isEqualTo(3);
+        assertThat(response.getAvailableCopies()).isEqualTo(3);
+        verify(bookRepository).save(any(Book.class));
+    }
+
+    // ---- delete ----
+
+    @Test
+    @DisplayName("delete supprime si aucun exemplaire emprunté")
+    void delete_success_whenAllCopiesAvailable() {
+        when(bookRepository.findById(1L)).thenReturn(Optional.of(book));
+
+        assertThatCode(() -> bookService.delete(1L)).doesNotThrowAnyException();
+        verify(bookRepository).delete(book);
+    }
+
+    @Test
+    @DisplayName("delete échoue si des exemplaires sont en cours d'emprunt")
+    void delete_fails_whenCopiesBorrowed() {
+        book.setAvailableCopies(1); // 1 exemplaire emprunté sur 3
+        when(bookRepository.findById(1L)).thenReturn(Optional.of(book));
+
+        assertThatThrownBy(() -> bookService.delete(1L))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("emprunté");
+
+        verify(bookRepository, never()).delete(any());
+    }
+
+    // ---- findAll ----
+
+    @Test
+    @DisplayName("findAll retourne une page de livres")
+    void findAll_returnsPaginatedResults() {
+        var pageable = PageRequest.of(0, 20);
+        when(bookRepository.findAll(pageable))
+                .thenReturn(new PageImpl<>(List.of(book)));
+        when(ratingRepository.findAverageStarsByBookId(any())).thenReturn(null);
+
+        var page = bookService.findAll(pageable);
+
+        assertThat(page.getContent()).hasSize(1);
+        assertThat(page.getContent().get(0).getTitle()).isEqualTo("Clean Code");
+    }
+
+    // ---- isAvailable ----
+
+    @Test
+    @DisplayName("isAvailable est vrai si availableCopies > 0")
+    void bookIsAvailable_whenCopiesRemaining() {
+        assertThat(book.isAvailable()).isTrue();
+    }
+
+    @Test
+    @DisplayName("isAvailable est faux si availableCopies = 0")
+    void bookIsNotAvailable_whenNoCopiesRemaining() {
+        book.setAvailableCopies(0);
+        assertThat(book.isAvailable()).isFalse();
+    }
+}
+</file>
+
+<file path="src/main/java/com/bookhub/service/DashboardService.java">
+package com.bookhub.service;
+
+import com.bookhub.dto.dashboard.LibrarianDashboardResponse;
+import com.bookhub.dto.dashboard.ReaderDashboardResponse;
+import com.bookhub.dto.loan.LoanResponse;
+import com.bookhub.dto.reservation.ReservationResponse;
+import com.bookhub.entity.*;
+import com.bookhub.exception.BusinessException;
+import com.bookhub.repository.*;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/**
+ * Service des tableaux de bord.
+ * Agrège les statistiques pour chaque type d'utilisateur.
+ */
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class DashboardService {
+
+    private final UserRepository userRepository;
+    private final BookRepository bookRepository;
+    private final LoanRepository loanRepository;
+    private final ReservationRepository reservationRepository;
+
+    // ----------------------------------------------------------------
+    // DASHBOARD LECTEUR
+    // ----------------------------------------------------------------
+
+    public ReaderDashboardResponse getReaderDashboard() {
+        User user = getCurrentUser();
+
+        List<Loan> activeLoans = loanRepository.findByUserAndStatus(user, LoanStatus.ACTIVE);
+        List<Loan> returnedLoans = loanRepository.findByUserAndStatus(user, LoanStatus.RETURNED);
+        List<Reservation> activeReservations = reservationRepository
+                .findByUserAndStatus(user, ReservationStatus.WAITING);
+
+        long overdueCount = activeLoans.stream().filter(Loan::isOverdue).count();
+
+        return ReaderDashboardResponse.builder()
+                .totalBooksRead(returnedLoans.size())
+                .activeLoans(activeLoans.size())
+                .overdueLoans((int) overdueCount)
+                .activeReservations(activeReservations.size())
+                .currentLoans(activeLoans.stream().map(this::toLoanResponse).toList())
+                .currentReservations(activeReservations.stream()
+                        .map(this::toReservationResponse).toList())
+                .build();
+    }
+
+    // ----------------------------------------------------------------
+    // DASHBOARD BIBLIOTHÉCAIRE / ADMIN
+    // ----------------------------------------------------------------
+
+    public LibrarianDashboardResponse getLibrarianDashboard() {
+        long totalBooks = bookRepository.count();
+        long totalUsers = userRepository.count();
+
+        List<Loan> activeLoans = loanRepository.findByStatus(LoanStatus.ACTIVE);
+        List<Loan> overdueLoans = activeLoans.stream()
+                .filter(Loan::isOverdue)
+                .toList();
+
+        // Top 10 livres les plus empruntés
+        List<Map<String, Object>> topBooks = loanRepository.findAll()
+                .stream()
+                .collect(Collectors.groupingBy(
+                        l -> l.getBook().getTitle(),
+                        Collectors.counting()))
+                .entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .limit(10)
+                .map(e -> Map.<String, Object>of(
+                        "title", e.getKey(),
+                        "count", e.getValue()))
+                .toList();
+
+        return LibrarianDashboardResponse.builder()
+                .totalBooks(totalBooks)
+                .totalUsers(totalUsers)
+                .activeLoans(activeLoans.size())
+                .overdueLoans(overdueLoans.size())
+                .overdueList(overdueLoans.stream().map(this::toLoanResponse).toList())
+                .topBooks(topBooks)
+                .build();
+    }
+
+    // ----------------------------------------------------------------
+    // UTILITAIRES PRIVÉS
+    // ----------------------------------------------------------------
+
+    private User getCurrentUser() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new BusinessException("Utilisateur non trouvé"));
+    }
+
+    private LoanResponse toLoanResponse(Loan loan) {
+        long daysOverdue = 0;
+        if (loan.isOverdue()) {
+            daysOverdue = java.time.temporal.ChronoUnit.DAYS
+                    .between(loan.getDueDate(), java.time.LocalDate.now());
+        }
+        return LoanResponse.builder()
+                .id(loan.getId())
+                .bookId(loan.getBook().getId())
+                .bookTitle(loan.getBook().getTitle())
+                .bookAuthor(loan.getBook().getAuthor())
+                .bookCoverUrl(loan.getBook().getCoverUrl())
+                .borrowedAt(loan.getBorrowedAt())
+                .dueDate(loan.getDueDate())
+                .returnedAt(loan.getReturnedAt())
+                .status(loan.getStatus())
+                .overdue(loan.isOverdue())
+                .daysOverdue(daysOverdue)
+                .build();
+    }
+
+    private ReservationResponse toReservationResponse(Reservation r) {
+        return ReservationResponse.builder()
+                .id(r.getId())
+                .bookId(r.getBook().getId())
+                .bookTitle(r.getBook().getTitle())
+                .bookAuthor(r.getBook().getAuthor())
+                .bookCoverUrl(r.getBook().getCoverUrl())
+                .status(r.getStatus())
+                .queuePosition(r.getQueuePosition())
+                .createdAt(r.getCreatedAt())
+                .build();
+    }
+}
+</file>
+
+<file path="src/main/java/com/bookhub/service/RatingService.java">
+package com.bookhub.service;
+
+import com.bookhub.dto.rating.RatingRequest;
+import com.bookhub.dto.rating.RatingResponse;
+import com.bookhub.entity.*;
+import com.bookhub.exception.BusinessException;
+import com.bookhub.exception.ResourceNotFoundException;
+import com.bookhub.repository.*;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+/**
+ * Service de notation et commentaires.
+ *
+ * Règles métier :
+ *  - Seul un lecteur ayant emprunté le livre peut le noter
+ *  - Une seule note par utilisateur par livre (modifiable)
+ *  - La note moyenne est calculée dynamiquement
+ *  - Un bibliothécaire peut supprimer tout commentaire
+ */
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class RatingService {
+
+    private final RatingRepository ratingRepository;
+    private final BookRepository bookRepository;
+    private final LoanRepository loanRepository;
+    private final UserRepository userRepository;
+
+    // ----------------------------------------------------------------
+    // NOTER / COMMENTER un livre
+    // ----------------------------------------------------------------
+
+    @Transactional
+    public RatingResponse rateBook(Long bookId, RatingRequest request) {
+        User user = getCurrentUser();
+        Book book = bookRepository.findById(bookId)
+                .orElseThrow(() -> new ResourceNotFoundException("Livre non trouvé : " + bookId));
+
+        // Vérifier que l'utilisateur a déjà emprunté ce livre
+        boolean hasEverBorrowed = loanRepository
+                .existsByUserAndBookIdAndStatus(user, bookId, LoanStatus.RETURNED);
+        if (!hasEverBorrowed) {
+            throw new BusinessException(
+                "Vous devez avoir emprunté et retourné ce livre pour pouvoir le noter");
+        }
+
+        // Si une note existe déjà → mise à jour
+        Rating rating = ratingRepository
+                .findByUserIdAndBookId(user.getId(), bookId)
+                .orElse(Rating.builder().user(user).book(book).build());
+
+        rating.setStars(request.getStars());
+        rating.setComment(request.getComment());
+        if (rating.getId() != null) {
+            rating.setUpdatedAt(LocalDateTime.now());
+        }
+
+        return toResponse(ratingRepository.save(rating));
+    }
+
+    // ----------------------------------------------------------------
+    // LIRE les avis d'un livre
+    // ----------------------------------------------------------------
+
+    public List<RatingResponse> getBookRatings(Long bookId) {
+        if (!bookRepository.existsById(bookId)) {
+            throw new ResourceNotFoundException("Livre non trouvé : " + bookId);
+        }
+        return ratingRepository.findByBookId(bookId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    public Double getBookAverageRating(Long bookId) {
+        return ratingRepository.findAverageStarsByBookId(bookId);
+    }
+
+    // ----------------------------------------------------------------
+    // SUPPRIMER un avis (bibliothécaire = modération, user = le sien)
+    // ----------------------------------------------------------------
+
+    @Transactional
+    public void deleteRating(Long ratingId) {
+        User user = getCurrentUser();
+        Rating rating = ratingRepository.findById(ratingId)
+                .orElseThrow(() -> new ResourceNotFoundException("Avis non trouvé : " + ratingId));
+
+        boolean isOwner = rating.getUser().getId().equals(user.getId());
+        boolean isLibrarianOrAdmin = user.getRole() == Role.LIBRARIAN
+                || user.getRole() == Role.ADMIN;
+
+        if (!isOwner && !isLibrarianOrAdmin) {
+            throw new BusinessException("Vous ne pouvez pas supprimer cet avis");
+        }
+
+        ratingRepository.delete(rating);
+    }
+
+    // ----------------------------------------------------------------
+    // UTILITAIRES PRIVÉS
+    // ----------------------------------------------------------------
+
+    private User getCurrentUser() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new BusinessException("Utilisateur non trouvé"));
+    }
+
+    private RatingResponse toResponse(Rating r) {
+        return RatingResponse.builder()
+                .id(r.getId())
+                .bookId(r.getBook().getId())
+                .bookTitle(r.getBook().getTitle())
+                .userId(r.getUser().getId())
+                .userFirstName(r.getUser().getFirstName())
+                .userLastName(r.getUser().getLastName())
+                .stars(r.getStars())
+                .comment(r.getComment())
+                .createdAt(r.getCreatedAt())
+                .updatedAt(r.getUpdatedAt())
+                .build();
+    }
+}
+</file>
+
+<file path=".gitattributes">
+/gradlew text eol=lf
+*.bat text eol=crlf
+*.jar binary
+</file>
+
+<file path=".gitignore">
+HELP.md
+.gradle
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+
+### VS Code ###
+.vscode/
+</file>
+
+<file path="gradle/wrapper/gradle-wrapper.properties">
+distributionBase=GRADLE_USER_HOME
+distributionPath=wrapper/dists
+distributionUrl=https\://services.gradle.org/distributions/gradle-9.4.1-bin.zip
+networkTimeout=10000
+validateDistributionUrl=true
+zipStoreBase=GRADLE_USER_HOME
+zipStorePath=wrapper/dists
+</file>
+
+<file path="gradlew">
+#!/bin/sh
+
+#
+# Copyright © 2015 the original authors.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# SPDX-License-Identifier: Apache-2.0
+#
+
+##############################################################################
+#
+#   Gradle start up script for POSIX generated by Gradle.
+#
+#   Important for running:
+#
+#   (1) You need a POSIX-compliant shell to run this script. If your /bin/sh is
+#       noncompliant, but you have some other compliant shell such as ksh or
+#       bash, then to run this script, type that shell name before the whole
+#       command line, like:
+#
+#           ksh Gradle
+#
+#       Busybox and similar reduced shells will NOT work, because this script
+#       requires all of these POSIX shell features:
+#         * functions;
+#         * expansions «$var», «${var}», «${var:-default}», «${var+SET}»,
+#           «${var#prefix}», «${var%suffix}», and «$( cmd )»;
+#         * compound commands having a testable exit status, especially «case»;
+#         * various built-in commands including «command», «set», and «ulimit».
+#
+#   Important for patching:
+#
+#   (2) This script targets any POSIX shell, so it avoids extensions provided
+#       by Bash, Ksh, etc; in particular arrays are avoided.
+#
+#       The "traditional" practice of packing multiple parameters into a
+#       space-separated string is a well documented source of bugs and security
+#       problems, so this is (mostly) avoided, by progressively accumulating
+#       options in "$@", and eventually passing that to Java.
+#
+#       Where the inherited environment variables (DEFAULT_JVM_OPTS, JAVA_OPTS,
+#       and GRADLE_OPTS) rely on word-splitting, this is performed explicitly;
+#       see the in-line comments for details.
+#
+#       There are tweaks for specific operating systems such as AIX, CygWin,
+#       Darwin, MinGW, and NonStop.
+#
+#   (3) This script is generated from the Groovy template
+#       https://github.com/gradle/gradle/blob/2d6327017519d23b96af35865dc997fcb544fb40/platforms/jvm/plugins-application/src/main/resources/org/gradle/api/internal/plugins/unixStartScript.txt
+#       within the Gradle project.
+#
+#       You can find Gradle at https://github.com/gradle/gradle/.
+#
+##############################################################################
+
+# Attempt to set APP_HOME
+
+# Resolve links: $0 may be a link
+app_path=$0
+
+# Need this for daisy-chained symlinks.
+while
+    APP_HOME=${app_path%"${app_path##*/}"}  # leaves a trailing /; empty if no leading path
+    [ -h "$app_path" ]
+do
+    ls=$( ls -ld "$app_path" )
+    link=${ls#*' -> '}
+    case $link in             #(
+      /*)   app_path=$link ;; #(
+      *)    app_path=$APP_HOME$link ;;
+    esac
+done
+
+# This is normally unused
+# shellcheck disable=SC2034
+APP_BASE_NAME=${0##*/}
+# Discard cd standard output in case $CDPATH is set (https://github.com/gradle/gradle/issues/25036)
+APP_HOME=$( cd -P "${APP_HOME:-./}" > /dev/null && printf '%s\n' "$PWD" ) || exit
+
+# Use the maximum available, or set MAX_FD != -1 to use that value.
+MAX_FD=maximum
+
+warn () {
+    echo "$*"
+} >&2
+
+die () {
+    echo
+    echo "$*"
+    echo
+    exit 1
+} >&2
+
+# OS specific support (must be 'true' or 'false').
+cygwin=false
+msys=false
+darwin=false
+nonstop=false
+case "$( uname )" in                #(
+  CYGWIN* )         cygwin=true  ;; #(
+  Darwin* )         darwin=true  ;; #(
+  MSYS* | MINGW* )  msys=true    ;; #(
+  NONSTOP* )        nonstop=true ;;
+esac
+
+
+
+# Determine the Java command to use to start the JVM.
+if [ -n "$JAVA_HOME" ] ; then
+    if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
+        # IBM's JDK on AIX uses strange locations for the executables
+        JAVACMD=$JAVA_HOME/jre/sh/java
+    else
+        JAVACMD=$JAVA_HOME/bin/java
+    fi
+    if [ ! -x "$JAVACMD" ] ; then
+        die "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME
+
+Please set the JAVA_HOME variable in your environment to match the
+location of your Java installation."
+    fi
+else
+    JAVACMD=java
+    if ! command -v java >/dev/null 2>&1
+    then
+        die "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH.
+
+Please set the JAVA_HOME variable in your environment to match the
+location of your Java installation."
+    fi
+fi
+
+# Increase the maximum file descriptors if we can.
+if ! "$cygwin" && ! "$darwin" && ! "$nonstop" ; then
+    case $MAX_FD in #(
+      max*)
+        # In POSIX sh, ulimit -H is undefined. That's why the result is checked to see if it worked.
+        # shellcheck disable=SC2039,SC3045
+        MAX_FD=$( ulimit -H -n ) ||
+            warn "Could not query maximum file descriptor limit"
+    esac
+    case $MAX_FD in  #(
+      '' | soft) :;; #(
+      *)
+        # In POSIX sh, ulimit -n is undefined. That's why the result is checked to see if it worked.
+        # shellcheck disable=SC2039,SC3045
+        ulimit -n "$MAX_FD" ||
+            warn "Could not set maximum file descriptor limit to $MAX_FD"
+    esac
+fi
+
+# Collect all arguments for the java command, stacking in reverse order:
+#   * args from the command line
+#   * the main class name
+#   * -classpath
+#   * -D...appname settings
+#   * --module-path (only if needed)
+#   * DEFAULT_JVM_OPTS, JAVA_OPTS, and GRADLE_OPTS environment variables.
+
+# For Cygwin or MSYS, switch paths to Windows format before running java
+if "$cygwin" || "$msys" ; then
+    APP_HOME=$( cygpath --path --mixed "$APP_HOME" )
+
+    JAVACMD=$( cygpath --unix "$JAVACMD" )
+
+    # Now convert the arguments - kludge to limit ourselves to /bin/sh
+    for arg do
+        if
+            case $arg in                                #(
+              -*)   false ;;                            # don't mess with options #(
+              /?*)  t=${arg#/} t=/${t%%/*}              # looks like a POSIX filepath
+                    [ -e "$t" ] ;;                      #(
+              *)    false ;;
+            esac
+        then
+            arg=$( cygpath --path --ignore --mixed "$arg" )
+        fi
+        # Roll the args list around exactly as many times as the number of
+        # args, so each arg winds up back in the position where it started, but
+        # possibly modified.
+        #
+        # NB: a `for` loop captures its iteration list before it begins, so
+        # changing the positional parameters here affects neither the number of
+        # iterations, nor the values presented in `arg`.
+        shift                   # remove old arg
+        set -- "$@" "$arg"      # push replacement arg
+    done
+fi
+
+
+# Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
+DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
+
+# Collect all arguments for the java command:
+#   * DEFAULT_JVM_OPTS, JAVA_OPTS, and optsEnvironmentVar are not allowed to contain shell fragments,
+#     and any embedded shellness will be escaped.
+#   * For example: A user cannot expect ${Hostname} to be expanded, as it is an environment variable and will be
+#     treated as '${Hostname}' itself on the command line.
+
+set -- \
+        "-Dorg.gradle.appname=$APP_BASE_NAME" \
+        -jar "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" \
+        "$@"
+
+# Stop when "xargs" is not available.
+if ! command -v xargs >/dev/null 2>&1
+then
+    die "xargs is not available"
+fi
+
+# Use "xargs" to parse quoted args.
+#
+# With -n1 it outputs one arg per line, with the quotes and backslashes removed.
+#
+# In Bash we could simply go:
+#
+#   readarray ARGS < <( xargs -n1 <<<"$var" ) &&
+#   set -- "${ARGS[@]}" "$@"
+#
+# but POSIX shell has neither arrays nor command substitution, so instead we
+# post-process each arg (as a line of input to sed) to backslash-escape any
+# character that might be a shell metacharacter, then use eval to reverse
+# that process (while maintaining the separation between arguments), and wrap
+# the whole thing up as a single "set" statement.
+#
+# This will of course break if any of these variables contains a newline or
+# an unmatched quote.
+#
+
+eval "set -- $(
+        printf '%s\n' "$DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS" |
+        xargs -n1 |
+        sed ' s~[^-[:alnum:]+,./:=@_]~\\&~g; ' |
+        tr '\n' ' '
+    )" '"$@"'
+
+exec "$JAVACMD" "$@"
+</file>
+
+<file path="gradlew.bat">
+@rem
+@rem Copyright 2015 the original author or authors.
+@rem
+@rem Licensed under the Apache License, Version 2.0 (the "License");
+@rem you may not use this file except in compliance with the License.
+@rem You may obtain a copy of the License at
+@rem
+@rem      https://www.apache.org/licenses/LICENSE-2.0
+@rem
+@rem Unless required by applicable law or agreed to in writing, software
+@rem distributed under the License is distributed on an "AS IS" BASIS,
+@rem WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+@rem See the License for the specific language governing permissions and
+@rem limitations under the License.
+@rem
+@rem SPDX-License-Identifier: Apache-2.0
+@rem
+
+@if "%DEBUG%"=="" @echo off
+@rem ##########################################################################
+@rem
+@rem  Gradle startup script for Windows
+@rem
+@rem ##########################################################################
+
+@rem Set local scope for the variables with windows NT shell
+if "%OS%"=="Windows_NT" setlocal
+
+set DIRNAME=%~dp0
+if "%DIRNAME%"=="" set DIRNAME=.
+@rem This is normally unused
+set APP_BASE_NAME=%~n0
+set APP_HOME=%DIRNAME%
+
+@rem Resolve any "." and ".." in APP_HOME to make it shorter.
+for %%i in ("%APP_HOME%") do set APP_HOME=%%~fi
+
+@rem Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
+set DEFAULT_JVM_OPTS="-Xmx64m" "-Xms64m"
+
+@rem Find java.exe
+if defined JAVA_HOME goto findJavaFromJavaHome
+
+set JAVA_EXE=java.exe
+%JAVA_EXE% -version >NUL 2>&1
+if %ERRORLEVEL% equ 0 goto execute
+
+echo. 1>&2
+echo ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH. 1>&2
+echo. 1>&2
+echo Please set the JAVA_HOME variable in your environment to match the 1>&2
+echo location of your Java installation. 1>&2
+
+goto fail
+
+:findJavaFromJavaHome
+set JAVA_HOME=%JAVA_HOME:"=%
+set JAVA_EXE=%JAVA_HOME%/bin/java.exe
+
+if exist "%JAVA_EXE%" goto execute
+
+echo. 1>&2
+echo ERROR: JAVA_HOME is set to an invalid directory: %JAVA_HOME% 1>&2
+echo. 1>&2
+echo Please set the JAVA_HOME variable in your environment to match the 1>&2
+echo location of your Java installation. 1>&2
+
+goto fail
+
+:execute
+@rem Setup the command line
+
+
+
+@rem Execute Gradle
+"%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -jar "%APP_HOME%\gradle\wrapper\gradle-wrapper.jar" %*
+
+:end
+@rem End local scope for the variables with windows NT shell
+if %ERRORLEVEL% equ 0 goto mainEnd
+
+:fail
+rem Set variable GRADLE_EXIT_CONSOLE if you need the _script_ return code instead of
+rem the _cmd.exe /c_ return code!
+set EXIT_CODE=%ERRORLEVEL%
+if %EXIT_CODE% equ 0 set EXIT_CODE=1
+if not ""=="%GRADLE_EXIT_CONSOLE%" exit %EXIT_CODE%
+exit /b %EXIT_CODE%
+
+:mainEnd
+if "%OS%"=="Windows_NT" endlocal
+
+:omega
+</file>
 
 <file path="README.md">
 # BookHub — Backend Spring Boot
@@ -159,6 +1312,10 @@ src/main/java/com/bookhub/
 - `ADMIN` : accès complet
 </file>
 
+<file path="settings.gradle">
+rootProject.name = 'book-hub-back'
+</file>
+
 <file path="src/main/java/com/bookhub/BookHubApplication.java">
 package com.bookhub;
 
@@ -227,7 +1384,14 @@ public class SecurityConfig {
                 .requestMatchers("/api/books/{id}").permitAll()
                 .requestMatchers("/api/books/search").permitAll()
                 // Swagger
-                .requestMatchers("/swagger-ui/**", "/api-docs/**", "/swagger-ui.html").permitAll()
+                .requestMatchers("/swagger-ui/**",
+                    "/swagger-ui.html",
+                    "/api-docs",
+                    "/api-docs/**",
+                    "/api-docs.yaml",
+                    "/v3/api-docs",
+                    "/v3/api-docs/**"
+                ).permitAll()
                 // Tout le reste nécessite une authentification
                 .anyRequest().authenticated()
             )
@@ -432,6 +1596,230 @@ public class BookController {
 }
 </file>
 
+<file path="src/main/java/com/bookhub/controller/LoanController.java">
+package com.bookhub.controller;
+
+import com.bookhub.dto.loan.LoanResponse;
+import com.bookhub.service.LoanService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+/**
+ * Contrôleur REST pour la gestion des emprunts.
+ *
+ * POST /api/loans/{bookId}          → emprunter (USER)
+ * GET  /api/loans/my                → mes emprunts actifs (USER)
+ * GET  /api/loans/my/history        → mon historique (USER)
+ * GET  /api/loans                   → tous les emprunts actifs (LIBRARIAN)
+ * GET  /api/loans/overdue           → emprunts en retard (LIBRARIAN)
+ * PUT  /api/loans/{id}/return       → enregistrer un retour (LIBRARIAN)
+ */
+@RestController
+@RequestMapping("/api/loans")
+@RequiredArgsConstructor
+@Tag(name = "Emprunts", description = "Gestion des emprunts de livres")
+@SecurityRequirement(name = "bearerAuth")
+public class LoanController {
+
+    private final LoanService loanService;
+
+    // ---- USER ----
+
+    @PostMapping("/{bookId}")
+    @Operation(summary = "Emprunter un livre")
+    public ResponseEntity<LoanResponse> borrowBook(@PathVariable Long bookId) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(loanService.borrowBook(bookId));
+    }
+
+    @GetMapping("/my")
+    @Operation(summary = "Mes emprunts en cours")
+    public ResponseEntity<List<LoanResponse>> getMyActiveLoans() {
+        return ResponseEntity.ok(loanService.getMyActiveLoans());
+    }
+
+    @GetMapping("/my/history")
+    @Operation(summary = "Mon historique d'emprunts")
+    public ResponseEntity<List<LoanResponse>> getMyLoanHistory() {
+        return ResponseEntity.ok(loanService.getMyLoanHistory());
+    }
+
+    // ---- LIBRARIAN / ADMIN ----
+
+    @GetMapping
+    @PreAuthorize("hasAnyRole('LIBRARIAN', 'ADMIN')")
+    @Operation(summary = "Tous les emprunts actifs (bibliothécaire)")
+    public ResponseEntity<List<LoanResponse>> getAllActiveLoans() {
+        return ResponseEntity.ok(loanService.getAllActiveLoans());
+    }
+
+    @GetMapping("/overdue")
+    @PreAuthorize("hasAnyRole('LIBRARIAN', 'ADMIN')")
+    @Operation(summary = "Emprunts en retard (bibliothécaire)")
+    public ResponseEntity<List<LoanResponse>> getOverdueLoans() {
+        return ResponseEntity.ok(loanService.getOverdueLoans());
+    }
+
+    @PutMapping("/{id}/return")
+    @PreAuthorize("hasAnyRole('LIBRARIAN', 'ADMIN')")
+    @Operation(summary = "Enregistrer le retour d'un livre")
+    public ResponseEntity<LoanResponse> returnBook(@PathVariable Long id) {
+        return ResponseEntity.ok(loanService.returnBook(id));
+    }
+}
+</file>
+
+<file path="src/main/java/com/bookhub/controller/ReservationController.java">
+package com.bookhub.controller;
+
+import com.bookhub.dto.reservation.ReservationResponse;
+import com.bookhub.service.ReservationService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+/**
+ * POST /api/reservations/{bookId}   → réserver un livre
+ * GET  /api/reservations/my         → mes réservations
+ * DELETE /api/reservations/{id}     → annuler une réservation
+ */
+@RestController
+@RequestMapping("/api/reservations")
+@RequiredArgsConstructor
+@Tag(name = "Réservations", description = "Gestion des réservations de livres")
+@SecurityRequirement(name = "bearerAuth")
+public class ReservationController {
+
+    private final ReservationService reservationService;
+
+    @PostMapping("/{bookId}")
+    @Operation(summary = "Réserver un livre indisponible")
+    public ResponseEntity<ReservationResponse> reserveBook(@PathVariable Long bookId) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(reservationService.reserveBook(bookId));
+    }
+
+    @GetMapping("/my")
+    @Operation(summary = "Mes réservations avec rang dans la file")
+    public ResponseEntity<List<ReservationResponse>> getMyReservations() {
+        return ResponseEntity.ok(reservationService.getMyReservations());
+    }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Annuler une réservation")
+    public ResponseEntity<Void> cancelReservation(@PathVariable Long id) {
+        reservationService.cancelReservation(id);
+        return ResponseEntity.noContent().build();
+    }
+}
+</file>
+
+<file path="src/main/java/com/bookhub/controller/UserController.java">
+package com.bookhub.controller;
+
+import com.bookhub.dto.user.ChangePasswordRequest;
+import com.bookhub.dto.user.UpdateProfileRequest;
+import com.bookhub.dto.user.UserResponse;
+import com.bookhub.service.UserService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+/**
+ * Contrôleur REST pour la gestion des profils utilisateurs.
+ *
+ * GET    /api/users/me                   → mon profil
+ * PUT    /api/users/me                   → modifier mon profil
+ * PUT    /api/users/me/password          → changer mon mot de passe
+ * DELETE /api/users/me                   → supprimer mon compte (RGPD)
+ * GET    /api/users                      → tous les users (ADMIN)
+ * GET    /api/users/{id}                 → un user (ADMIN)
+ * PUT    /api/users/{id}/toggle-active   → activer/désactiver (ADMIN)
+ */
+@RestController
+@RequestMapping("/api/users")
+@RequiredArgsConstructor
+@Tag(name = "Utilisateurs", description = "Gestion des profils et comptes")
+@SecurityRequirement(name = "bearerAuth")
+public class UserController {
+
+    private final UserService userService;
+
+    // ---- Profil personnel ----
+
+    @GetMapping("/me")
+    @Operation(summary = "Consulter mon profil")
+    public ResponseEntity<UserResponse> getMyProfile() {
+        return ResponseEntity.ok(userService.getMyProfile());
+    }
+
+    @PutMapping("/me")
+    @Operation(summary = "Modifier mon profil (prénom, nom, téléphone)")
+    public ResponseEntity<UserResponse> updateProfile(
+            @Valid @RequestBody UpdateProfileRequest request) {
+        return ResponseEntity.ok(userService.updateProfile(request));
+    }
+
+    @PutMapping("/me/password")
+    @Operation(summary = "Changer mon mot de passe")
+    public ResponseEntity<Void> changePassword(
+            @Valid @RequestBody ChangePasswordRequest request) {
+        userService.changePassword(request);
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/me")
+    @Operation(summary = "Supprimer mon compte (droit à l'oubli RGPD)")
+    public ResponseEntity<Void> deleteMyAccount() {
+        userService.deleteMyAccount();
+        return ResponseEntity.noContent().build();
+    }
+
+    // ---- Administration (ADMIN uniquement) ----
+
+    @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Lister tous les utilisateurs")
+    public ResponseEntity<List<UserResponse>> getAllUsers() {
+        return ResponseEntity.ok(userService.getAllUsers());
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Détail d'un utilisateur")
+    public ResponseEntity<UserResponse> getUserById(@PathVariable Long id) {
+        return ResponseEntity.ok(userService.getUserById(id));
+    }
+
+    @PutMapping("/{id}/toggle-active")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "Activer / désactiver un compte utilisateur")
+    public ResponseEntity<UserResponse> toggleUserActive(@PathVariable Long id) {
+        return ResponseEntity.ok(userService.toggleUserActive(id));
+    }
+}
+</file>
+
 <file path="src/main/java/com/bookhub/dto/auth/AuthResponse.java">
 package com.bookhub.dto.auth;
 
@@ -552,6 +1940,115 @@ public class BookResponse {
     private int availableCopies;
     private boolean available;
     private Double averageRating;
+    private LocalDateTime createdAt;
+}
+</file>
+
+<file path="src/main/java/com/bookhub/dto/loan/LoanResponse.java">
+package com.bookhub.dto.loan;
+
+import com.bookhub.entity.LoanStatus;
+import lombok.Builder;
+import lombok.Data;
+
+import java.time.LocalDate;
+
+@Data
+@Builder
+public class LoanResponse {
+    private Long id;
+    private Long bookId;
+    private String bookTitle;
+    private String bookAuthor;
+    private String bookCoverUrl;
+    private LocalDate borrowedAt;
+    private LocalDate dueDate;
+    private LocalDate returnedAt;
+    private LoanStatus status;
+    private boolean overdue;
+    private long daysOverdue;
+}
+</file>
+
+<file path="src/main/java/com/bookhub/dto/reservation/ReservationResponse.java">
+package com.bookhub.dto.reservation;
+
+import com.bookhub.entity.ReservationStatus;
+import lombok.Builder;
+import lombok.Data;
+import java.time.LocalDateTime;
+
+@Data
+@Builder
+public class ReservationResponse {
+    private Long id;
+    private Long bookId;
+    private String bookTitle;
+    private String bookAuthor;
+    private String bookCoverUrl;
+    private ReservationStatus status;
+    private int queuePosition;
+    private LocalDateTime createdAt;
+}
+</file>
+
+<file path="src/main/java/com/bookhub/dto/user/ChangePasswordRequest.java">
+package com.bookhub.dto.user;
+
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import lombok.Data;
+
+@Data
+public class ChangePasswordRequest {
+
+    @NotBlank(message = "L'ancien mot de passe est obligatoire")
+    private String currentPassword;
+
+    @Pattern(
+        regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{12,}$",
+        message = "Mot de passe : 12+ caractères, 1 majuscule, 1 minuscule, 1 chiffre, 1 caractère spécial"
+    )
+    private String newPassword;
+}
+</file>
+
+<file path="src/main/java/com/bookhub/dto/user/UpdateProfileRequest.java">
+package com.bookhub.dto.user;
+
+import jakarta.validation.constraints.NotBlank;
+import lombok.Data;
+
+@Data
+public class UpdateProfileRequest {
+
+    @NotBlank(message = "Le prénom est obligatoire")
+    private String firstName;
+
+    @NotBlank(message = "Le nom est obligatoire")
+    private String lastName;
+
+    private String phone;
+}
+</file>
+
+<file path="src/main/java/com/bookhub/dto/user/UserResponse.java">
+package com.bookhub.dto.user;
+
+import com.bookhub.entity.Role;
+import lombok.Builder;
+import lombok.Data;
+import java.time.LocalDateTime;
+
+@Data
+@Builder
+public class UserResponse {
+    private Long id;
+    private String firstName;
+    private String lastName;
+    private String email;
+    private String phone;
+    private Role role;
     private LocalDateTime createdAt;
 }
 </file>
@@ -916,23 +2413,6 @@ public interface BookRepository extends JpaRepository<Book, Long> {
 }
 </file>
 
-<file path="src/main/java/com/bookhub/repository/LoanRepository.java">
-package com.bookhub.repository;
-
-import com.bookhub.entity.Loan;
-import com.bookhub.entity.LoanStatus;
-import com.bookhub.entity.User;
-import org.springframework.data.jpa.repository.JpaRepository;
-import java.util.List;
-
-public interface LoanRepository extends JpaRepository<Loan, Long> {
-    List<Loan> findByUserAndStatus(User user, LoanStatus status);
-    List<Loan> findByUser(User user);
-    long countByUserAndStatus(User user, LoanStatus status);
-    boolean existsByUserAndBookIdAndStatus(User user, Long bookId, LoanStatus status);
-}
-</file>
-
 <file path="src/main/java/com/bookhub/repository/RatingRepository.java">
 package com.bookhub.repository;
 
@@ -959,10 +2439,12 @@ import com.bookhub.entity.Reservation;
 import com.bookhub.entity.ReservationStatus;
 import com.bookhub.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+
 import java.util.List;
 
 public interface ReservationRepository extends JpaRepository<Reservation, Long> {
     List<Reservation> findByUser(User user);
+    List<Reservation> findByUserAndStatus(User user, ReservationStatus status);
     long countByUserAndStatus(User user, ReservationStatus status);
     boolean existsByUserIdAndBookIdAndStatus(Long userId, Long bookId, ReservationStatus status);
     List<Reservation> findByBookIdAndStatusOrderByQueuePosition(Long bookId, ReservationStatus status);
@@ -1343,6 +2825,498 @@ public class BookService {
 }
 </file>
 
+<file path="src/main/java/com/bookhub/service/LoanService.java">
+package com.bookhub.service;
+
+import com.bookhub.dto.loan.LoanResponse;
+import com.bookhub.entity.*;
+import com.bookhub.exception.BusinessException;
+import com.bookhub.exception.ResourceNotFoundException;
+import com.bookhub.repository.BookRepository;
+import com.bookhub.repository.LoanRepository;
+import com.bookhub.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+
+/**
+ * Service gérant la logique métier des emprunts.
+ *
+ * Règles de gestion (cahier des charges) :
+ *  RG-LOAN-01 : Maximum 3 emprunts actifs par utilisateur
+ *  RG-LOAN-02 : Durée d'emprunt = 14 jours
+ *  RG-LOAN-03 : Bloqué si l'utilisateur a un emprunt en retard
+ *  RG-LOAN-04 : Un même livre peut être ré-emprunté après retour
+ */
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class LoanService {
+
+    private static final int MAX_ACTIVE_LOANS = 3;
+    private static final int LOAN_DURATION_DAYS = 14;
+
+    private final LoanRepository loanRepository;
+    private final BookRepository bookRepository;
+    private final UserRepository userRepository;
+
+    // ----------------------------------------------------------------
+    // EMPRUNTER un livre
+    // ----------------------------------------------------------------
+
+    /**
+     * Crée un emprunt pour l'utilisateur connecté.
+     * Vérifie toutes les règles de gestion avant de procéder.
+     */
+    @Transactional
+    public LoanResponse borrowBook(Long bookId) {
+        User user = getCurrentUser();
+        Book book = bookRepository.findById(bookId)
+                .orElseThrow(() -> new ResourceNotFoundException("Livre non trouvé : " + bookId));
+
+        // RG : livre disponible
+        if (!book.isAvailable()) {
+            throw new BusinessException("Ce livre n'est pas disponible à l'emprunt");
+        }
+
+        // RG-LOAN-01 : max 3 emprunts actifs
+        long activeLoans = loanRepository.countByUserAndStatus(user, LoanStatus.ACTIVE);
+        if (activeLoans >= MAX_ACTIVE_LOANS) {
+            throw new BusinessException(
+                "Vous avez atteint le maximum de " + MAX_ACTIVE_LOANS + " emprunts simultanés");
+        }
+
+        // RG-LOAN-03 : bloqué si retard en cours
+        boolean hasOverdue = loanRepository.findByUserAndStatus(user, LoanStatus.ACTIVE)
+                .stream().anyMatch(Loan::isOverdue);
+        if (hasOverdue) {
+            throw new BusinessException(
+                "Vous avez un emprunt en retard. Veuillez retourner le livre avant d'en emprunter un nouveau");
+        }
+
+        // Tout est OK : créer l'emprunt
+        LocalDate today = LocalDate.now();
+        Loan loan = Loan.builder()
+                .user(user)
+                .book(book)
+                .borrowedAt(today)
+                .dueDate(today.plusDays(LOAN_DURATION_DAYS))  // RG-LOAN-02
+                .status(LoanStatus.ACTIVE)
+                .build();
+
+        // Décrémenter le stock
+        book.setAvailableCopies(book.getAvailableCopies() - 1);
+        bookRepository.save(book);
+
+        return toResponse(loanRepository.save(loan));
+    }
+
+    // ----------------------------------------------------------------
+    // MES EMPRUNTS (utilisateur connecté)
+    // ----------------------------------------------------------------
+
+    /** Emprunts actifs de l'utilisateur connecté */
+    public List<LoanResponse> getMyActiveLoans() {
+        User user = getCurrentUser();
+        return loanRepository.findByUserAndStatus(user, LoanStatus.ACTIVE)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    /** Historique complet des emprunts de l'utilisateur connecté */
+    public List<LoanResponse> getMyLoanHistory() {
+        User user = getCurrentUser();
+        return loanRepository.findByUser(user)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    // ----------------------------------------------------------------
+    // RETOUR (bibliothécaire)
+    // ----------------------------------------------------------------
+
+    /**
+     * Enregistre le retour d'un livre.
+     * Calcule automatiquement le retard, libère un exemplaire.
+     */
+    @Transactional
+    public LoanResponse returnBook(Long loanId) {
+        Loan loan = loanRepository.findById(loanId)
+                .orElseThrow(() -> new ResourceNotFoundException("Emprunt non trouvé : " + loanId));
+
+        if (loan.getStatus() != LoanStatus.ACTIVE) {
+            throw new BusinessException("Cet emprunt est déjà clôturé");
+        }
+
+        LocalDate today = LocalDate.now();
+        loan.setReturnedAt(today);
+        loan.setStatus(LoanStatus.RETURNED);
+
+        // Incrémenter le stock
+        Book book = loan.getBook();
+        book.setAvailableCopies(book.getAvailableCopies() + 1);
+        bookRepository.save(book);
+
+        return toResponse(loanRepository.save(loan));
+    }
+
+    // ----------------------------------------------------------------
+    // TOUS LES EMPRUNTS (bibliothécaire)
+    // ----------------------------------------------------------------
+
+    /** Liste tous les emprunts actifs — accès bibliothécaire */
+    public List<LoanResponse> getAllActiveLoans() {
+        return loanRepository.findByStatus(LoanStatus.ACTIVE)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    /** Liste tous les emprunts en retard — accès bibliothécaire */
+    public List<LoanResponse> getOverdueLoans() {
+        return loanRepository.findByStatus(LoanStatus.ACTIVE)
+                .stream()
+                .filter(Loan::isOverdue)
+                .map(this::toResponse)
+                .toList();
+    }
+
+    // ----------------------------------------------------------------
+    // UTILITAIRES PRIVÉS
+    // ----------------------------------------------------------------
+
+    /** Récupère l'utilisateur connecté depuis le contexte de sécurité */
+    private User getCurrentUser() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new BusinessException("Utilisateur non trouvé"));
+    }
+
+    /** Convertit une entité Loan en DTO de réponse */
+    private LoanResponse toResponse(Loan loan) {
+        long daysOverdue = 0;
+        if (loan.isOverdue()) {
+            daysOverdue = ChronoUnit.DAYS.between(loan.getDueDate(), LocalDate.now());
+        }
+
+        return LoanResponse.builder()
+                .id(loan.getId())
+                .bookId(loan.getBook().getId())
+                .bookTitle(loan.getBook().getTitle())
+                .bookAuthor(loan.getBook().getAuthor())
+                .bookCoverUrl(loan.getBook().getCoverUrl())
+                .borrowedAt(loan.getBorrowedAt())
+                .dueDate(loan.getDueDate())
+                .returnedAt(loan.getReturnedAt())
+                .status(loan.getStatus())
+                .overdue(loan.isOverdue())
+                .daysOverdue(daysOverdue)
+                .build();
+    }
+}
+</file>
+
+<file path="src/main/java/com/bookhub/service/ReservationService.java">
+package com.bookhub.service;
+
+import com.bookhub.dto.reservation.ReservationResponse;
+import com.bookhub.entity.*;
+import com.bookhub.exception.BusinessException;
+import com.bookhub.exception.ResourceNotFoundException;
+import com.bookhub.repository.BookRepository;
+import com.bookhub.repository.ReservationRepository;
+import com.bookhub.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+/**
+ * Service gérant les réservations de livres.
+ *
+ * Règles de gestion :
+ *  - Réserver uniquement si le livre est indisponible
+ *  - Maximum 5 réservations actives par utilisateur
+ *  - Pas de doublon (même livre déjà réservé en attente)
+ *  - File d'attente : position calculée automatiquement
+ */
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class ReservationService {
+
+    private static final int MAX_RESERVATIONS = 5;
+
+    private final ReservationRepository reservationRepository;
+    private final BookRepository bookRepository;
+    private final UserRepository userRepository;
+
+    // ----------------------------------------------------------------
+    // RÉSERVER un livre
+    // ----------------------------------------------------------------
+
+    @Transactional
+    public ReservationResponse reserveBook(Long bookId) {
+        User user = getCurrentUser();
+        Book book = bookRepository.findById(bookId)
+                .orElseThrow(() -> new ResourceNotFoundException("Livre non trouvé : " + bookId));
+
+        // On réserve uniquement si le livre est indisponible
+        if (book.isAvailable()) {
+            throw new BusinessException(
+                "Ce livre est disponible, vous pouvez l'emprunter directement");
+        }
+
+        // Pas de doublon : déjà une réservation en attente sur ce livre
+        boolean alreadyReserved = reservationRepository
+                .existsByUserIdAndBookIdAndStatus(user.getId(), bookId, ReservationStatus.WAITING);
+        if (alreadyReserved) {
+            throw new BusinessException("Vous avez déjà une réservation en attente pour ce livre");
+        }
+
+        // Max 5 réservations actives
+        long activeReservations = reservationRepository
+                .countByUserAndStatus(user, ReservationStatus.WAITING);
+        if (activeReservations >= MAX_RESERVATIONS) {
+            throw new BusinessException(
+                "Vous avez atteint le maximum de " + MAX_RESERVATIONS + " réservations simultanées");
+        }
+
+        // Position dans la file = nombre de réservations en attente sur ce livre + 1
+        int queuePosition = reservationRepository
+                .findByBookIdAndStatusOrderByQueuePosition(bookId, ReservationStatus.WAITING)
+                .size() + 1;
+
+        Reservation reservation = Reservation.builder()
+                .user(user)
+                .book(book)
+                .status(ReservationStatus.WAITING)
+                .queuePosition(queuePosition)
+                .build();
+
+        return toResponse(reservationRepository.save(reservation));
+    }
+
+    // ----------------------------------------------------------------
+    // MES RÉSERVATIONS
+    // ----------------------------------------------------------------
+
+    public List<ReservationResponse> getMyReservations() {
+        User user = getCurrentUser();
+        return reservationRepository.findByUser(user)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    // ----------------------------------------------------------------
+    // ANNULER une réservation
+    // ----------------------------------------------------------------
+
+    @Transactional
+    public void cancelReservation(Long reservationId) {
+        User user = getCurrentUser();
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                    "Réservation non trouvée : " + reservationId));
+
+        // L'utilisateur ne peut annuler que ses propres réservations
+        if (!reservation.getUser().getId().equals(user.getId())) {
+            throw new BusinessException("Vous ne pouvez pas annuler cette réservation");
+        }
+
+        if (reservation.getStatus() != ReservationStatus.WAITING) {
+            throw new BusinessException("Cette réservation ne peut plus être annulée");
+        }
+
+        reservation.setStatus(ReservationStatus.CANCELLED);
+        reservationRepository.save(reservation);
+
+        // Recalculer les positions dans la file pour ce livre
+        reorderQueue(reservation.getBook().getId(), reservation.getQueuePosition());
+    }
+
+    // ----------------------------------------------------------------
+    // UTILITAIRES PRIVÉS
+    // ----------------------------------------------------------------
+
+    /**
+     * Après annulation, décrémente la position de tous les suivants dans la file.
+     * Ex : file [1, 2, 3, 4] → annulation du 2 → [1, 2, 3]
+     */
+    private void reorderQueue(Long bookId, int cancelledPosition) {
+        List<Reservation> waitingAfter = reservationRepository
+                .findByBookIdAndStatusOrderByQueuePosition(bookId, ReservationStatus.WAITING)
+                .stream()
+                .filter(r -> r.getQueuePosition() > cancelledPosition)
+                .toList();
+
+        waitingAfter.forEach(r -> r.setQueuePosition(r.getQueuePosition() - 1));
+        reservationRepository.saveAll(waitingAfter);
+    }
+
+    private User getCurrentUser() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new BusinessException("Utilisateur non trouvé"));
+    }
+
+    private ReservationResponse toResponse(Reservation r) {
+        return ReservationResponse.builder()
+                .id(r.getId())
+                .bookId(r.getBook().getId())
+                .bookTitle(r.getBook().getTitle())
+                .bookAuthor(r.getBook().getAuthor())
+                .bookCoverUrl(r.getBook().getCoverUrl())
+                .status(r.getStatus())
+                .queuePosition(r.getQueuePosition())
+                .createdAt(r.getCreatedAt())
+                .build();
+    }
+}
+</file>
+
+<file path="src/main/java/com/bookhub/service/UserService.java">
+package com.bookhub.service;
+
+import com.bookhub.dto.user.ChangePasswordRequest;
+import com.bookhub.dto.user.UpdateProfileRequest;
+import com.bookhub.dto.user.UserResponse;
+import com.bookhub.entity.User;
+import com.bookhub.exception.BusinessException;
+import com.bookhub.exception.ResourceNotFoundException;
+import com.bookhub.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
+
+/**
+ * Service gérant le profil utilisateur.
+ * Couvre : consultation, modification, changement de mot de passe,
+ * suppression de compte (droit à l'oubli RGPD) et gestion des rôles (admin).
+ */
+@Service
+@RequiredArgsConstructor
+@Transactional(readOnly = true)
+public class UserService {
+
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    // ----------------------------------------------------------------
+    // PROFIL — utilisateur connecté
+    // ----------------------------------------------------------------
+
+    /** Retourne le profil de l'utilisateur connecté */
+    public UserResponse getMyProfile() {
+        return toResponse(getCurrentUser());
+    }
+
+    /** Modifie prénom, nom, téléphone */
+    @Transactional
+    public UserResponse updateProfile(UpdateProfileRequest request) {
+        User user = getCurrentUser();
+        user.setFirstName(request.getFirstName());
+        user.setLastName(request.getLastName());
+        user.setPhone(request.getPhone());
+        return toResponse(userRepository.save(user));
+    }
+
+    /** Changement de mot de passe avec vérification de l'ancien */
+    @Transactional
+    public void changePassword(ChangePasswordRequest request) {
+        User user = getCurrentUser();
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPassword())) {
+            throw new BusinessException("Mot de passe actuel incorrect");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+    }
+
+    /**
+     * Suppression du compte — droit à l'oubli RGPD.
+     * On désactive le compte plutôt que de le supprimer physiquement
+     * pour préserver l'intégrité des données historiques (emprunts, etc.)
+     */
+    @Transactional
+    public void deleteMyAccount() {
+        User user = getCurrentUser();
+        user.setActive(false);
+        // Anonymisation des données personnelles (RGPD)
+        user.setFirstName("Utilisateur");
+        user.setLastName("Supprimé");
+        user.setPhone(null);
+        // L'email est conservé pour éviter la réinscription avec le même email
+        userRepository.save(user);
+    }
+
+    // ----------------------------------------------------------------
+    // ADMIN — gestion des utilisateurs
+    // ----------------------------------------------------------------
+
+    /** Liste tous les utilisateurs — accès ADMIN uniquement */
+    public List<UserResponse> getAllUsers() {
+        return userRepository.findAll()
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    /** Détail d'un utilisateur par son ID — accès ADMIN */
+    public UserResponse getUserById(Long id) {
+        return userRepository.findById(id)
+                .map(this::toResponse)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur non trouvé : " + id));
+    }
+
+    /** Active ou désactive un compte — accès ADMIN */
+    @Transactional
+    public UserResponse toggleUserActive(Long id) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Utilisateur non trouvé : " + id));
+        user.setActive(!user.isActive());
+        return toResponse(userRepository.save(user));
+    }
+
+    // ----------------------------------------------------------------
+    // UTILITAIRES PRIVÉS
+    // ----------------------------------------------------------------
+
+    private User getCurrentUser() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new BusinessException("Utilisateur non trouvé"));
+    }
+
+    private UserResponse toResponse(User user) {
+        return UserResponse.builder()
+                .id(user.getId())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .role(user.getRole())
+                .createdAt(user.getCreatedAt())
+                .build();
+    }
+}
+</file>
+
 <file path="src/test/java/com/bookhub/BookHubApplicationTests.java">
 package com.bookhub;
 
@@ -1359,52 +3333,6 @@ class BookHubApplicationTests {
         // Vérifie que le contexte Spring Boot démarre sans erreur
     }
 }
-</file>
-
-<file path=".gitattributes">
-/gradlew text eol=lf
-*.bat text eol=crlf
-*.jar binary
-</file>
-
-<file path=".gitignore">
-HELP.md
-.gradle
-build/
-!gradle/wrapper/gradle-wrapper.jar
-!**/src/main/**/build/
-!**/src/test/**/build/
-
-### STS ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
-bin/
-!**/src/main/**/bin/
-!**/src/test/**/bin/
-
-### IntelliJ IDEA ###
-.idea
-*.iws
-*.iml
-*.ipr
-out/
-!**/src/main/**/out/
-!**/src/test/**/out/
-
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-
-### VS Code ###
-.vscode/
 </file>
 
 <file path="build.gradle">
@@ -1464,365 +3392,23 @@ tasks.named('test') {
 }
 </file>
 
-<file path="gradle/wrapper/gradle-wrapper.properties">
-distributionBase=GRADLE_USER_HOME
-distributionPath=wrapper/dists
-distributionUrl=https\://services.gradle.org/distributions/gradle-9.4.1-bin.zip
-networkTimeout=10000
-validateDistributionUrl=true
-zipStoreBase=GRADLE_USER_HOME
-zipStorePath=wrapper/dists
-</file>
+<file path="src/main/java/com/bookhub/repository/LoanRepository.java">
+package com.bookhub.repository;
 
-<file path="gradlew">
-#!/bin/sh
+import com.bookhub.entity.Loan;
+import com.bookhub.entity.LoanStatus;
+import com.bookhub.entity.User;
+import org.springframework.data.jpa.repository.JpaRepository;
 
-#
-# Copyright © 2015 the original authors.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#      https://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-# SPDX-License-Identifier: Apache-2.0
-#
+import java.util.List;
 
-##############################################################################
-#
-#   Gradle start up script for POSIX generated by Gradle.
-#
-#   Important for running:
-#
-#   (1) You need a POSIX-compliant shell to run this script. If your /bin/sh is
-#       noncompliant, but you have some other compliant shell such as ksh or
-#       bash, then to run this script, type that shell name before the whole
-#       command line, like:
-#
-#           ksh Gradle
-#
-#       Busybox and similar reduced shells will NOT work, because this script
-#       requires all of these POSIX shell features:
-#         * functions;
-#         * expansions «$var», «${var}», «${var:-default}», «${var+SET}»,
-#           «${var#prefix}», «${var%suffix}», and «$( cmd )»;
-#         * compound commands having a testable exit status, especially «case»;
-#         * various built-in commands including «command», «set», and «ulimit».
-#
-#   Important for patching:
-#
-#   (2) This script targets any POSIX shell, so it avoids extensions provided
-#       by Bash, Ksh, etc; in particular arrays are avoided.
-#
-#       The "traditional" practice of packing multiple parameters into a
-#       space-separated string is a well documented source of bugs and security
-#       problems, so this is (mostly) avoided, by progressively accumulating
-#       options in "$@", and eventually passing that to Java.
-#
-#       Where the inherited environment variables (DEFAULT_JVM_OPTS, JAVA_OPTS,
-#       and GRADLE_OPTS) rely on word-splitting, this is performed explicitly;
-#       see the in-line comments for details.
-#
-#       There are tweaks for specific operating systems such as AIX, CygWin,
-#       Darwin, MinGW, and NonStop.
-#
-#   (3) This script is generated from the Groovy template
-#       https://github.com/gradle/gradle/blob/2d6327017519d23b96af35865dc997fcb544fb40/platforms/jvm/plugins-application/src/main/resources/org/gradle/api/internal/plugins/unixStartScript.txt
-#       within the Gradle project.
-#
-#       You can find Gradle at https://github.com/gradle/gradle/.
-#
-##############################################################################
-
-# Attempt to set APP_HOME
-
-# Resolve links: $0 may be a link
-app_path=$0
-
-# Need this for daisy-chained symlinks.
-while
-    APP_HOME=${app_path%"${app_path##*/}"}  # leaves a trailing /; empty if no leading path
-    [ -h "$app_path" ]
-do
-    ls=$( ls -ld "$app_path" )
-    link=${ls#*' -> '}
-    case $link in             #(
-      /*)   app_path=$link ;; #(
-      *)    app_path=$APP_HOME$link ;;
-    esac
-done
-
-# This is normally unused
-# shellcheck disable=SC2034
-APP_BASE_NAME=${0##*/}
-# Discard cd standard output in case $CDPATH is set (https://github.com/gradle/gradle/issues/25036)
-APP_HOME=$( cd -P "${APP_HOME:-./}" > /dev/null && printf '%s\n' "$PWD" ) || exit
-
-# Use the maximum available, or set MAX_FD != -1 to use that value.
-MAX_FD=maximum
-
-warn () {
-    echo "$*"
-} >&2
-
-die () {
-    echo
-    echo "$*"
-    echo
-    exit 1
-} >&2
-
-# OS specific support (must be 'true' or 'false').
-cygwin=false
-msys=false
-darwin=false
-nonstop=false
-case "$( uname )" in                #(
-  CYGWIN* )         cygwin=true  ;; #(
-  Darwin* )         darwin=true  ;; #(
-  MSYS* | MINGW* )  msys=true    ;; #(
-  NONSTOP* )        nonstop=true ;;
-esac
-
-
-
-# Determine the Java command to use to start the JVM.
-if [ -n "$JAVA_HOME" ] ; then
-    if [ -x "$JAVA_HOME/jre/sh/java" ] ; then
-        # IBM's JDK on AIX uses strange locations for the executables
-        JAVACMD=$JAVA_HOME/jre/sh/java
-    else
-        JAVACMD=$JAVA_HOME/bin/java
-    fi
-    if [ ! -x "$JAVACMD" ] ; then
-        die "ERROR: JAVA_HOME is set to an invalid directory: $JAVA_HOME
-
-Please set the JAVA_HOME variable in your environment to match the
-location of your Java installation."
-    fi
-else
-    JAVACMD=java
-    if ! command -v java >/dev/null 2>&1
-    then
-        die "ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH.
-
-Please set the JAVA_HOME variable in your environment to match the
-location of your Java installation."
-    fi
-fi
-
-# Increase the maximum file descriptors if we can.
-if ! "$cygwin" && ! "$darwin" && ! "$nonstop" ; then
-    case $MAX_FD in #(
-      max*)
-        # In POSIX sh, ulimit -H is undefined. That's why the result is checked to see if it worked.
-        # shellcheck disable=SC2039,SC3045
-        MAX_FD=$( ulimit -H -n ) ||
-            warn "Could not query maximum file descriptor limit"
-    esac
-    case $MAX_FD in  #(
-      '' | soft) :;; #(
-      *)
-        # In POSIX sh, ulimit -n is undefined. That's why the result is checked to see if it worked.
-        # shellcheck disable=SC2039,SC3045
-        ulimit -n "$MAX_FD" ||
-            warn "Could not set maximum file descriptor limit to $MAX_FD"
-    esac
-fi
-
-# Collect all arguments for the java command, stacking in reverse order:
-#   * args from the command line
-#   * the main class name
-#   * -classpath
-#   * -D...appname settings
-#   * --module-path (only if needed)
-#   * DEFAULT_JVM_OPTS, JAVA_OPTS, and GRADLE_OPTS environment variables.
-
-# For Cygwin or MSYS, switch paths to Windows format before running java
-if "$cygwin" || "$msys" ; then
-    APP_HOME=$( cygpath --path --mixed "$APP_HOME" )
-
-    JAVACMD=$( cygpath --unix "$JAVACMD" )
-
-    # Now convert the arguments - kludge to limit ourselves to /bin/sh
-    for arg do
-        if
-            case $arg in                                #(
-              -*)   false ;;                            # don't mess with options #(
-              /?*)  t=${arg#/} t=/${t%%/*}              # looks like a POSIX filepath
-                    [ -e "$t" ] ;;                      #(
-              *)    false ;;
-            esac
-        then
-            arg=$( cygpath --path --ignore --mixed "$arg" )
-        fi
-        # Roll the args list around exactly as many times as the number of
-        # args, so each arg winds up back in the position where it started, but
-        # possibly modified.
-        #
-        # NB: a `for` loop captures its iteration list before it begins, so
-        # changing the positional parameters here affects neither the number of
-        # iterations, nor the values presented in `arg`.
-        shift                   # remove old arg
-        set -- "$@" "$arg"      # push replacement arg
-    done
-fi
-
-
-# Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
-DEFAULT_JVM_OPTS='"-Xmx64m" "-Xms64m"'
-
-# Collect all arguments for the java command:
-#   * DEFAULT_JVM_OPTS, JAVA_OPTS, and optsEnvironmentVar are not allowed to contain shell fragments,
-#     and any embedded shellness will be escaped.
-#   * For example: A user cannot expect ${Hostname} to be expanded, as it is an environment variable and will be
-#     treated as '${Hostname}' itself on the command line.
-
-set -- \
-        "-Dorg.gradle.appname=$APP_BASE_NAME" \
-        -jar "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" \
-        "$@"
-
-# Stop when "xargs" is not available.
-if ! command -v xargs >/dev/null 2>&1
-then
-    die "xargs is not available"
-fi
-
-# Use "xargs" to parse quoted args.
-#
-# With -n1 it outputs one arg per line, with the quotes and backslashes removed.
-#
-# In Bash we could simply go:
-#
-#   readarray ARGS < <( xargs -n1 <<<"$var" ) &&
-#   set -- "${ARGS[@]}" "$@"
-#
-# but POSIX shell has neither arrays nor command substitution, so instead we
-# post-process each arg (as a line of input to sed) to backslash-escape any
-# character that might be a shell metacharacter, then use eval to reverse
-# that process (while maintaining the separation between arguments), and wrap
-# the whole thing up as a single "set" statement.
-#
-# This will of course break if any of these variables contains a newline or
-# an unmatched quote.
-#
-
-eval "set -- $(
-        printf '%s\n' "$DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS" |
-        xargs -n1 |
-        sed ' s~[^-[:alnum:]+,./:=@_]~\\&~g; ' |
-        tr '\n' ' '
-    )" '"$@"'
-
-exec "$JAVACMD" "$@"
-</file>
-
-<file path="gradlew.bat">
-@rem
-@rem Copyright 2015 the original author or authors.
-@rem
-@rem Licensed under the Apache License, Version 2.0 (the "License");
-@rem you may not use this file except in compliance with the License.
-@rem You may obtain a copy of the License at
-@rem
-@rem      https://www.apache.org/licenses/LICENSE-2.0
-@rem
-@rem Unless required by applicable law or agreed to in writing, software
-@rem distributed under the License is distributed on an "AS IS" BASIS,
-@rem WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-@rem See the License for the specific language governing permissions and
-@rem limitations under the License.
-@rem
-@rem SPDX-License-Identifier: Apache-2.0
-@rem
-
-@if "%DEBUG%"=="" @echo off
-@rem ##########################################################################
-@rem
-@rem  Gradle startup script for Windows
-@rem
-@rem ##########################################################################
-
-@rem Set local scope for the variables with windows NT shell
-if "%OS%"=="Windows_NT" setlocal
-
-set DIRNAME=%~dp0
-if "%DIRNAME%"=="" set DIRNAME=.
-@rem This is normally unused
-set APP_BASE_NAME=%~n0
-set APP_HOME=%DIRNAME%
-
-@rem Resolve any "." and ".." in APP_HOME to make it shorter.
-for %%i in ("%APP_HOME%") do set APP_HOME=%%~fi
-
-@rem Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
-set DEFAULT_JVM_OPTS="-Xmx64m" "-Xms64m"
-
-@rem Find java.exe
-if defined JAVA_HOME goto findJavaFromJavaHome
-
-set JAVA_EXE=java.exe
-%JAVA_EXE% -version >NUL 2>&1
-if %ERRORLEVEL% equ 0 goto execute
-
-echo. 1>&2
-echo ERROR: JAVA_HOME is not set and no 'java' command could be found in your PATH. 1>&2
-echo. 1>&2
-echo Please set the JAVA_HOME variable in your environment to match the 1>&2
-echo location of your Java installation. 1>&2
-
-goto fail
-
-:findJavaFromJavaHome
-set JAVA_HOME=%JAVA_HOME:"=%
-set JAVA_EXE=%JAVA_HOME%/bin/java.exe
-
-if exist "%JAVA_EXE%" goto execute
-
-echo. 1>&2
-echo ERROR: JAVA_HOME is set to an invalid directory: %JAVA_HOME% 1>&2
-echo. 1>&2
-echo Please set the JAVA_HOME variable in your environment to match the 1>&2
-echo location of your Java installation. 1>&2
-
-goto fail
-
-:execute
-@rem Setup the command line
-
-
-
-@rem Execute Gradle
-"%JAVA_EXE%" %DEFAULT_JVM_OPTS% %JAVA_OPTS% %GRADLE_OPTS% "-Dorg.gradle.appname=%APP_BASE_NAME%" -jar "%APP_HOME%\gradle\wrapper\gradle-wrapper.jar" %*
-
-:end
-@rem End local scope for the variables with windows NT shell
-if %ERRORLEVEL% equ 0 goto mainEnd
-
-:fail
-rem Set variable GRADLE_EXIT_CONSOLE if you need the _script_ return code instead of
-rem the _cmd.exe /c_ return code!
-set EXIT_CODE=%ERRORLEVEL%
-if %EXIT_CODE% equ 0 set EXIT_CODE=1
-if not ""=="%GRADLE_EXIT_CONSOLE%" exit %EXIT_CODE%
-exit /b %EXIT_CODE%
-
-:mainEnd
-if "%OS%"=="Windows_NT" endlocal
-
-:omega
-</file>
-
-<file path="settings.gradle">
-rootProject.name = 'book-hub-back'
+public interface LoanRepository extends JpaRepository<Loan, Long> {
+    List<Loan> findByUserAndStatus(User user, LoanStatus status);
+    List<Loan> findByUser(User user);
+    List<Loan> findByStatus(LoanStatus status);   // ← manquait dans la version initiale
+    long countByUserAndStatus(User user, LoanStatus status);
+    boolean existsByUserAndBookIdAndStatus(User user, Long bookId, LoanStatus status);
+}
 </file>
 
 <file path="src/main/resources/application.properties">
